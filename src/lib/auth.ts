@@ -1,20 +1,30 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { APIError, createAuthMiddleware } from "better-auth/api";
 import { nextCookies } from "better-auth/next-js";
 import { after } from "next/server";
 import { db } from "@/db";
 import * as schema from "@/db/schema";
 import { sendEmail } from "@/lib/email";
+import { MIN_PASSWORD_LENGTH, signUpSchema } from "@/lib/validation";
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
     provider: "pg",
     schema,
   }),
+  user: {
+    additionalFields: {
+      firstName: { type: "string", required: true, input: true },
+      lastName: { type: "string", required: true, input: true },
+    },
+  },
   emailAndPassword: {
     enabled: true,
-    requireEmailVerification: true,
-    minPasswordLength: 12,
+    // Registration signs the user in immediately and redirects to /feed, so we
+    // don't gate sign-in on email verification.
+    requireEmailVerification: false,
+    minPasswordLength: MIN_PASSWORD_LENGTH,
     revokeSessionsOnPasswordReset: true,
     sendResetPassword: async ({ user, url }) => {
       await sendEmail({
@@ -33,6 +43,30 @@ export const auth = betterAuth({
         text: `Click the link to verify your email: ${url}`,
       });
     },
+  },
+  hooks: {
+    // Server-side validation for email sign-up, and derive `name` from the
+    // required first/last name fields so it is always the concatenation.
+    before: createAuthMiddleware(async (ctx) => {
+      if (ctx.path !== "/sign-up/email") return;
+      const result = signUpSchema.safeParse(ctx.body);
+      if (!result.success) {
+        throw new APIError("BAD_REQUEST", {
+          message:
+            result.error.issues[0]?.message ?? "Invalid registration details",
+        });
+      }
+      const { firstName, lastName } = result.data;
+      return {
+        context: {
+          ...ctx,
+          body: {
+            ...ctx.body,
+            name: `${firstName} ${lastName}`,
+          },
+        },
+      };
+    }),
   },
   advanced: {
     // On serverless, ensure background email sends finish before the function
