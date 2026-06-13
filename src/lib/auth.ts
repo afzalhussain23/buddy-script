@@ -1,4 +1,4 @@
-import { betterAuth } from "better-auth";
+import { betterAuth } from "better-auth/minimal";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import { nextCookies } from "better-auth/next-js";
@@ -19,11 +19,15 @@ export const auth = betterAuth({
       lastName: { type: "string", required: true, input: true },
     },
   },
+  session: {
+    cookieCache: {
+      enabled: true,
+      maxAge: 5 * 60,
+    },
+  },
   emailAndPassword: {
     enabled: true,
-    // Registration signs the user in immediately and redirects to /feed, so we
-    // don't gate sign-in on email verification.
-    requireEmailVerification: false,
+    requireEmailVerification: false, // TODO: gate sign-in on email verification before launch
     minPasswordLength: MIN_PASSWORD_LENGTH,
     revokeSessionsOnPasswordReset: true,
     sendResetPassword: async ({ user, url }) => {
