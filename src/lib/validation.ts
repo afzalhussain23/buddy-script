@@ -1,30 +1,47 @@
 import { z } from "zod";
 
-export const MIN_PASSWORD_LENGTH = 12;
+export const MAX_NAME_LENGTH = 100;
+export const MAX_EMAIL_LENGTH = 254;
+export const MIN_PASSWORD_LENGTH = 8;
+export const MAX_PASSWORD_LENGTH = 128;
 
-/**
- * Server-side sign-up payload (what the client actually sends to
- * `/sign-up/email`). `repeatPassword` is intentionally not part of this — it is
- * a client-only concern validated in `registerFormSchema`.
- */
 export const signUpSchema = z.object({
-  firstName: z.string().trim().min(1, "First name is required"),
-  lastName: z.string().trim().min(1, "Last name is required"),
-  email: z.email("Please enter a valid email address"),
+  firstName: z
+    .string()
+    .trim()
+    .min(1, "First name is required")
+    .max(
+      MAX_NAME_LENGTH,
+      `First name must be at most ${MAX_NAME_LENGTH} characters`,
+    ),
+  lastName: z
+    .string()
+    .trim()
+    .min(1, "Last name is required")
+    .max(
+      MAX_NAME_LENGTH,
+      `Last name must be at most ${MAX_NAME_LENGTH} characters`,
+    ),
+  email: z
+    .email("Please enter a valid email address")
+    .max(
+      MAX_EMAIL_LENGTH,
+      `Email must be at most ${MAX_EMAIL_LENGTH} characters`,
+    ),
   password: z
     .string()
     .min(
       MIN_PASSWORD_LENGTH,
       `Password must be at least ${MIN_PASSWORD_LENGTH} characters`,
+    )
+    .max(
+      MAX_PASSWORD_LENGTH,
+      `Password must be at most ${MAX_PASSWORD_LENGTH} characters`,
     ),
 });
 
 export type SignUpInput = z.infer<typeof signUpSchema>;
 
-/**
- * Full register form, including the repeat-password match check used on the
- * client before calling Better Auth.
- */
 export const registerFormSchema = signUpSchema
   .extend({
     repeatPassword: z.string(),
@@ -37,8 +54,19 @@ export const registerFormSchema = signUpSchema
 export type RegisterFormInput = z.infer<typeof registerFormSchema>;
 
 export const signInSchema = z.object({
-  email: z.email("Please enter a valid email address"),
-  password: z.string().min(1, "Password is required"),
+  email: z
+    .email("Please enter a valid email address")
+    .max(
+      MAX_EMAIL_LENGTH,
+      `Email must be at most ${MAX_EMAIL_LENGTH} characters`,
+    ),
+  password: z
+    .string()
+    .min(1, "Password is required")
+    .max(
+      MAX_PASSWORD_LENGTH,
+      `Password must be at most ${MAX_PASSWORD_LENGTH} characters`,
+    ),
 });
 
 export type SignInInput = z.infer<typeof signInSchema>;

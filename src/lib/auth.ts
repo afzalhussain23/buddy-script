@@ -6,7 +6,11 @@ import { after } from "next/server";
 import { db } from "@/db";
 import * as schema from "@/db/schema";
 import { sendEmail } from "@/lib/email";
-import { MIN_PASSWORD_LENGTH, signUpSchema } from "@/lib/validation";
+import {
+  MAX_PASSWORD_LENGTH,
+  MIN_PASSWORD_LENGTH,
+  signUpSchema,
+} from "@/lib/validation";
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
@@ -29,6 +33,7 @@ export const auth = betterAuth({
     enabled: true,
     requireEmailVerification: false, // TODO: gate sign-in on email verification before launch
     minPasswordLength: MIN_PASSWORD_LENGTH,
+    maxPasswordLength: MAX_PASSWORD_LENGTH,
     revokeSessionsOnPasswordReset: true,
     sendResetPassword: async ({ user, url }) => {
       await sendEmail({
@@ -49,8 +54,6 @@ export const auth = betterAuth({
     },
   },
   hooks: {
-    // Server-side validation for email sign-up, and derive `name` from the
-    // required first/last name fields so it is always the concatenation.
     before: createAuthMiddleware(async (ctx) => {
       if (ctx.path !== "/sign-up/email") return;
       const result = signUpSchema.safeParse(ctx.body);
