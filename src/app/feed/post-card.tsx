@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { toggleLike } from "./actions";
+import { loadMoreComments, toggleLike } from "./actions";
 import { CommentBox } from "./comment-box";
 import {
   CommentIcon,
@@ -10,7 +10,7 @@ import {
   ShareIcon,
   ThreeDotsIcon,
 } from "./feed-icons";
-import type { FeedPost } from "./queries";
+import type { FeedComment, FeedPost } from "./queries";
 
 // Fallback avatar (user images aren't uploaded yet — see auth.user.image).
 const DEFAULT_AVATAR = "/assets/images/post_img.png";
@@ -21,7 +21,15 @@ export function PostCard({ post }: { post: FeedPost }) {
 
   const [liked, setLiked] = useState(post.likedByMe);
   const [likeCount, setLikeCount] = useState(post.likeCount);
+  const [commentCount, setCommentCount] = useState(post.commentCount);
+  const [loadedComments, setLoadedComments] = useState(post.comments);
+  const [newComments, setNewComments] = useState<FeedComment[]>([]);
+  const [nextCommentCursor, setNextCommentCursor] = useState(
+    post.nextCommentCursor,
+  );
+  const [commentLoadError, setCommentLoadError] = useState<string | null>(null);
   const [isLiking, startLike] = useTransition();
+  const [isLoadingComments, startLoadComments] = useTransition();
 
   // Optimistically flip the like + count, then reconcile with the server's
   // authoritative count (or revert on failure). The action is idempotent, so a
@@ -48,6 +56,34 @@ export function PostCard({ post }: { post: FeedPost }) {
 
       setLiked(prevLiked);
       setLikeCount(prevCount);
+    });
+  }
+
+  function handleCommentCreated(comment: FeedComment, nextCount: number) {
+    setNewComments((prev) => [...prev, comment]);
+    setCommentCount(nextCount);
+  }
+
+  function handleLoadMoreComments() {
+    if (!nextCommentCursor) return;
+
+    setCommentLoadError(null);
+    startLoadComments(async () => {
+      try {
+        const result = await loadMoreComments({
+          postId: post.id,
+          cursor: nextCommentCursor,
+        });
+
+        if (result.ok) {
+          setLoadedComments((prev) => [...prev, ...result.page.comments]);
+          setNextCommentCursor(result.page.nextCursor);
+        } else {
+          setCommentLoadError(result.error);
+        }
+      } catch {
+        setCommentLoadError("Could not load more comments.");
+      }
     });
   }
 
@@ -126,7 +162,8 @@ export function PostCard({ post }: { post: FeedPost }) {
         </div>
         <div className="_feed_inner_timeline_total_reacts_txt">
           <p className="_feed_inner_timeline_total_reacts_para1">
-            <span>{post.commentCount}</span> Comment
+            <span>{commentCount}</span>{" "}
+            {commentCount === 1 ? "Comment" : "Comments"}
           </p>
         </div>
       </div>
@@ -171,7 +208,74 @@ export function PostCard({ post }: { post: FeedPost }) {
       </div>
 
       <div className="_feed_inner_timeline_cooment_area">
-        <CommentBox avatar="/assets/images/comment_img.png" />
+        {loadedComments.map((comment) => (
+          <CommentRow key={comment.id} comment={comment} />
+        ))}
+        {nextCommentCursor ? (
+          <button
+            type="button"
+            onClick={handleLoadMoreComments}
+            disabled={isLoadingComments}
+            className="_feed_inner_comment_box_icon_btn"
+            style={{
+              cursor: "pointer",
+              display: "block",
+              fontSize: 13,
+              fontWeight: 600,
+              margin: "0 0 16px 60px",
+              padding: "6px 0",
+            }}
+          >
+            {isLoadingComments ? "Loading comments..." : "Load more comments"}
+          </button>
+        ) : null}
+        {commentLoadError ? (
+          <p
+            className="_feed_inner_timeline_post_box_para"
+            style={{ color: "#d92d20", margin: "0 0 16px 60px" }}
+          >
+            {commentLoadError}
+          </p>
+        ) : null}
+        {newComments.map((comment) => (
+          <CommentRow key={comment.id} comment={comment} />
+        ))}
+        <CommentBox
+          avatar="/assets/images/comment_img.png"
+          postId={post.id}
+          onCreated={handleCommentCreated}
+        />
+      </div>
+    </div>
+  );
+}
+
+function CommentRow({ comment }: { comment: FeedComment }) {
+  return (
+    <div className="_comment_main _mar_b16">
+      <div className="_comment_image">
+        {/* biome-ignore lint/performance/noImgElement: theme markup parity */}
+        <img
+          src={comment.authorImage ?? DEFAULT_AVATAR}
+          alt=""
+          className="_comment_img1"
+        />
+      </div>
+      <div className="_comment_area">
+        <div className="_comment_details" style={{ margin: "0 0 8px" }}>
+          <div className="_comment_details_top">
+            <div className="_comment_name">
+              <h4 className="_comment_name_title">{comment.authorName}</h4>
+              <p className="_comment_status_text">{comment.body}</p>
+            </div>
+          </div>
+        </div>
+        <p
+          className="_feed_inner_timeline_post_box_para"
+          style={{ margin: "0 0 12px" }}
+        >
+          {comment.time}
+        </p>
       </div>
     </div>
   );

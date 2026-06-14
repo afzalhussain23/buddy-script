@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { uuidv7 } from "uuidv7";
 import { db } from "@/db";
-import { imageUploads, postLikes, posts } from "@/db/social";
+import { comments, imageUploads, postLikes, posts } from "@/db/social";
 import { auth } from "@/lib/auth";
 import {
   deleteR2Object,
@@ -16,9 +16,13 @@ import {
 import { consumeRateLimit } from "@/lib/rate-limit";
 import { formatRelativeTime } from "@/lib/relative-time";
 import {
+  type CommentCursor,
+  type CommentPage,
+  type FeedComment,
   type FeedCursor,
   type FeedPage,
   type FeedPost,
+  getCommentsPage,
   getFeedPage,
 } from "./queries";
 
@@ -27,6 +31,8 @@ type CreatePostResult =
   | { ok: false; error: string };
 const POST_LIMIT = 20;
 const POST_LIMIT_WINDOW_MS = 10 * 60 * 1000;
+const COMMENT_LIMIT = 30;
+const COMMENT_LIMIT_WINDOW_MS = 10 * 60 * 1000;
 
 // Shape a freshly-inserted row into a FeedPost so the client can render it
 // without a round-trip. The author is always the current session user.
@@ -45,6 +51,8 @@ function toFeedPost(
     // A just-created post starts unliked, even for its author.
     likedByMe: false,
     commentCount: row.commentCount,
+    comments: [],
+    nextCommentCursor: null,
     time: formatRelativeTime(row.createdAt),
   };
 }
@@ -253,10 +261,128 @@ export async function toggleLike(input: {
   return { ok: true, liked, likeCount: Number(row.like_count) };
 }
 
+type CreateCommentResult =
+  | { ok: true; comment: FeedComment; commentCount: number }
+  | { ok: false; error: string };
+
+export async function createComment(input: {
+  postId: string;
+  body: string;
+}): Promise<CreateCommentResult> {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session) return { ok: false, error: "Authentication required." };
+
+  if (
+    !input ||
+    typeof input.postId !== "string" ||
+    typeof input.body !== "string"
+  ) {
+    return { ok: false, error: "Invalid comment data." };
+  }
+
+  const body = input.body.trim();
+  if (!body) {
+    return { ok: false, error: "Write a comment before posting." };
+  }
+  if (body.length > 2000) {
+    return { ok: false, error: "Comment must be at most 2,000 characters." };
+  }
+
+  const userId = session.user.id;
+  const rateLimit = await consumeRateLimit({
+    action: "create-comment",
+    identifier: userId,
+    limit: COMMENT_LIMIT,
+    windowMs: COMMENT_LIMIT_WINDOW_MS,
+  });
+  if (!rateLimit.allowed) {
+    return { ok: false, error: "Too many comments. Please try again shortly." };
+  }
+
+  const commentId = uuidv7();
+  const result = await db.execute<{
+    id: string;
+    post_id: string;
+    body: string;
+    created_at: string | Date;
+    comment_count: number;
+  }>(sql`
+    with target as (
+      select ${posts.id} from ${posts}
+      where ${posts.id} = ${input.postId}
+        and ${posts.deletedAt} is null
+        and (${posts.isPrivate} = false or ${posts.authorId} = ${userId})
+    ),
+    inserted as (
+      insert into ${comments} (id, post_id, author_id, body)
+      select ${commentId}, target.id, ${userId}, ${body} from target
+      returning id, post_id, body, created_at
+    ),
+    updated as (
+      update ${posts}
+      set comment_count = comment_count + (select count(*) from inserted)
+      where ${posts.id} = ${input.postId} and exists (select 1 from inserted)
+      returning comment_count
+    )
+    select inserted.id,
+      inserted.post_id,
+      inserted.body,
+      inserted.created_at,
+      updated.comment_count
+    from inserted cross join updated
+  `);
+
+  const row = result.rows[0];
+  if (!row) {
+    return { ok: false, error: "Post not found." };
+  }
+
+  revalidatePath("/feed");
+  return {
+    ok: true,
+    comment: {
+      id: row.id,
+      postId: row.post_id,
+      authorName: session.user.name,
+      authorImage: session.user.image ?? null,
+      body: row.body,
+      time: formatRelativeTime(new Date()),
+    },
+    commentCount: Number(row.comment_count),
+  };
+}
+
 export async function loadMorePosts(cursor: FeedCursor): Promise<FeedPage> {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) {
     return { posts: [], nextCursor: null };
   }
   return getFeedPage(session.user.id, cursor);
+}
+
+type LoadMoreCommentsResult =
+  | { ok: true; page: CommentPage }
+  | { ok: false; error: string };
+
+export async function loadMoreComments(input: {
+  postId: string;
+  cursor: CommentCursor;
+}): Promise<LoadMoreCommentsResult> {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session) return { ok: false, error: "Authentication required." };
+
+  if (
+    !input ||
+    typeof input.postId !== "string" ||
+    !input.cursor ||
+    typeof input.cursor.id !== "string" ||
+    typeof input.cursor.createdAt !== "string"
+  ) {
+    return { ok: false, error: "Invalid comment cursor." };
+  }
+
+  return {
+    ok: true,
+    page: await getCommentsPage(session.user.id, input.postId, input.cursor),
+  };
 }

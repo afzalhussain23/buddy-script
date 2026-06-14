@@ -1,10 +1,23 @@
-import { and, desc, eq, isNull, lt, or, type SQL, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  inArray,
+  isNull,
+  lt,
+  lte,
+  or,
+  type SQL,
+  sql,
+} from "drizzle-orm";
 import { db } from "@/db";
 import { user } from "@/db/auth";
-import { postLikes, posts } from "@/db/social";
+import { comments, postLikes, posts } from "@/db/social";
 import { formatRelativeTime } from "@/lib/relative-time";
 
 export const FEED_PAGE_SIZE = 20;
+export const COMMENT_PAGE_SIZE = 10;
 
 // Keyset (not OFFSET) cursor: the created_at + id of the last row returned. The
 // feed orders by created_at DESC, so id alone isn't a sufficient keyset — id is
@@ -12,6 +25,16 @@ export const FEED_PAGE_SIZE = 20;
 // ISO string to survive the server-action boundary; the column is millisecond
 // precision so the value round-trips exactly (see posts.createdAt).
 export type FeedCursor = { createdAt: string; id: string };
+export type CommentCursor = { createdAt: string; id: string };
+
+export type FeedComment = {
+  id: string;
+  postId: string;
+  authorName: string;
+  authorImage: string | null;
+  body: string;
+  time: string;
+};
 
 export type FeedPost = {
   id: string;
@@ -23,6 +46,8 @@ export type FeedPost = {
   likeCount: number;
   likedByMe: boolean;
   commentCount: number;
+  comments: FeedComment[];
+  nextCommentCursor: CommentCursor | null;
   time: string;
 };
 
@@ -30,6 +55,29 @@ export type FeedPage = {
   posts: FeedPost[];
   nextCursor: FeedCursor | null;
 };
+
+export type CommentPage = {
+  comments: FeedComment[];
+  nextCursor: CommentCursor | null;
+};
+
+function toFeedComment(row: {
+  id: string;
+  postId: string;
+  body: string;
+  createdAt: Date;
+  authorName: string | null;
+  authorImage: string | null;
+}): FeedComment {
+  return {
+    id: row.id,
+    postId: row.postId,
+    authorName: row.authorName ?? "[deleted user]",
+    authorImage: row.authorImage,
+    body: row.body,
+    time: formatRelativeTime(row.createdAt),
+  };
+}
 
 // Visible posts for `viewerId`: anything public, plus the viewer's own private
 // posts. Ordered created_at DESC, id DESC to match the partial feed index, with
@@ -83,6 +131,59 @@ export async function getFeedPage(
   const hasMore = rows.length > FEED_PAGE_SIZE;
   const page = hasMore ? rows.slice(0, FEED_PAGE_SIZE) : rows;
   const last = page.at(-1);
+  const postIds = page.map((post) => post.id);
+  const rankedComments = db
+    .select({
+      id: comments.id,
+      postId: comments.postId,
+      authorId: comments.authorId,
+      body: comments.body,
+      createdAt: comments.createdAt,
+      createdAtCursor:
+        sql<string>`to_char(${comments.createdAt}, 'YYYY-MM-DD"T"HH24:MI:SS.US')`.as(
+          "created_at_cursor",
+        ),
+      rank: sql<number>`row_number() over (
+        partition by ${comments.postId}
+        order by ${comments.createdAt} asc, ${comments.id} asc
+      )`.as("comment_rank"),
+    })
+    .from(comments)
+    .where(
+      and(
+        inArray(comments.postId, postIds),
+        isNull(comments.parentId),
+        isNull(comments.deletedAt),
+      ),
+    )
+    .as("ranked_comments");
+  const commentRows = postIds.length
+    ? await db
+        .select({
+          id: rankedComments.id,
+          postId: rankedComments.postId,
+          body: rankedComments.body,
+          createdAt: rankedComments.createdAt,
+          createdAtCursor: rankedComments.createdAtCursor,
+          authorName: user.name,
+          authorImage: user.image,
+        })
+        .from(rankedComments)
+        .leftJoin(user, eq(rankedComments.authorId, user.id))
+        .where(lte(rankedComments.rank, COMMENT_PAGE_SIZE + 1))
+        .orderBy(
+          asc(rankedComments.postId),
+          asc(rankedComments.createdAt),
+          asc(rankedComments.id),
+        )
+    : [];
+
+  const commentRowsByPost = new Map<string, typeof commentRows>();
+  for (const comment of commentRows) {
+    const list = commentRowsByPost.get(comment.postId) ?? [];
+    list.push(comment);
+    commentRowsByPost.set(comment.postId, list);
+  }
 
   return {
     posts: page.map((r) => ({
@@ -96,11 +197,80 @@ export async function getFeedPage(
       likeCount: r.likeCount,
       likedByMe: r.likedByMe,
       commentCount: r.commentCount,
+      comments: (commentRowsByPost.get(r.id) ?? [])
+        .slice(0, COMMENT_PAGE_SIZE)
+        .map(toFeedComment),
+      nextCommentCursor: (() => {
+        const postComments = commentRowsByPost.get(r.id) ?? [];
+        const cursorComment = postComments[COMMENT_PAGE_SIZE - 1];
+        return postComments.length > COMMENT_PAGE_SIZE && cursorComment
+          ? {
+              createdAt: cursorComment.createdAtCursor,
+              id: cursorComment.id,
+            }
+          : null;
+      })(),
       time: formatRelativeTime(r.createdAt),
     })),
     nextCursor:
       hasMore && last
         ? { createdAt: last.createdAt.toISOString(), id: last.id }
         : null,
+  };
+}
+
+export async function getCommentsPage(
+  viewerId: string,
+  postId: string,
+  cursor?: CommentCursor,
+): Promise<CommentPage> {
+  const conditions: (SQL | undefined)[] = [
+    eq(comments.postId, postId),
+    isNull(comments.parentId),
+    isNull(comments.deletedAt),
+    sql`exists (
+      select 1 from ${posts}
+      where ${posts.id} = ${postId}
+        and ${posts.deletedAt} is null
+        and (${posts.isPrivate} = false or ${posts.authorId} = ${viewerId})
+    )`,
+  ];
+
+  if (cursor) {
+    conditions.push(
+      or(
+        sql`${comments.createdAt} > ${cursor.createdAt}::timestamp`,
+        and(
+          sql`${comments.createdAt} = ${cursor.createdAt}::timestamp`,
+          sql`${comments.id} > ${cursor.id}::uuid`,
+        ),
+      ),
+    );
+  }
+
+  const rows = await db
+    .select({
+      id: comments.id,
+      postId: comments.postId,
+      body: comments.body,
+      createdAt: comments.createdAt,
+      createdAtCursor: sql<string>`to_char(${comments.createdAt}, 'YYYY-MM-DD"T"HH24:MI:SS.US')`,
+      authorName: user.name,
+      authorImage: user.image,
+    })
+    .from(comments)
+    .leftJoin(user, eq(comments.authorId, user.id))
+    .where(and(...conditions))
+    .orderBy(asc(comments.createdAt), asc(comments.id))
+    .limit(COMMENT_PAGE_SIZE + 1);
+
+  const hasMore = rows.length > COMMENT_PAGE_SIZE;
+  const page = hasMore ? rows.slice(0, COMMENT_PAGE_SIZE) : rows;
+  const last = page.at(-1);
+
+  return {
+    comments: page.map(toFeedComment),
+    nextCursor:
+      hasMore && last ? { createdAt: last.createdAtCursor, id: last.id } : null,
   };
 }
