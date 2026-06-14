@@ -4,7 +4,7 @@ import { APIError, createAuthMiddleware } from "better-auth/api";
 import { nextCookies } from "better-auth/next-js";
 import { after } from "next/server";
 import { db } from "@/db";
-import * as schema from "@/db/schema";
+import * as schema from "@/db/auth";
 import { sendEmail } from "@/lib/email";
 import {
   MAX_PASSWORD_LENGTH,
