@@ -2,15 +2,10 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { DarkModeToggle } from "./dark-mode-toggle";
-import {
-  friends,
-  posts,
-  stories,
-  suggestedPeople,
-  youMightLike,
-} from "./feed-data";
+import { friends, stories, suggestedPeople, youMightLike } from "./feed-data";
 import { FeedNav } from "./feed-nav";
-import { PostCard } from "./post-card";
+import { FeedPosts } from "./feed-posts";
+import { getFeedPage } from "./queries";
 
 export default async function FeedPage() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -18,6 +13,8 @@ export default async function FeedPage() {
   if (!session) {
     redirect("/login");
   }
+
+  const { posts, nextCursor } = await getFeedPage(session.user.id);
 
   return (
     <div className="_layout _layout_main_wrapper">
@@ -343,9 +340,10 @@ export default async function FeedPage() {
                     </div>
 
                     {/* Posts */}
-                    {posts.map((post) => (
-                      <PostCard key={post.id} post={post} />
-                    ))}
+                    <FeedPosts
+                      initialPosts={posts}
+                      initialCursor={nextCursor}
+                    />
                   </div>
                 </div>
               </div>

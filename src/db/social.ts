@@ -31,10 +31,11 @@ export const posts = pgTable(
     deletedAt: timestamp("deleted_at"),
   },
   (table) => [
-    // Keyset pagination of the feed (ORDER BY created_at DESC, id DESC), live posts only.
+    // Keyset pagination of the feed (ORDER BY id DESC), live posts only. id is a
+    // uuidv7, so id order tracks creation order — a single-column keyset is enough.
     // Partial on `deleted_at IS NULL` keeps soft-deleted rows out of the hot feed index.
-    index("posts_created_at_id_idx")
-      .on(desc(table.createdAt), desc(table.id))
+    index("posts_feed_id_idx")
+      .on(desc(table.id))
       .where(sql`${table.deletedAt} is null`),
     // Speeds the ON DELETE SET NULL lookup and author-filtered reads (own/private posts).
     // Partial: both only query `author_id = <id>` (strict, so excludes NULL), so anonymized

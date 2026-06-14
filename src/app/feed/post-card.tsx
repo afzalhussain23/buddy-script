@@ -2,18 +2,19 @@
 
 import { useEffect, useRef, useState } from "react";
 import { CommentBox } from "./comment-box";
-import type { Post } from "./feed-data";
 import {
   CommentIcon,
   HahaEmoji,
-  HeartIcon,
   postMenuItems,
   ShareIcon,
   ThreeDotsIcon,
-  ThumbsUpIcon,
 } from "./feed-icons";
+import type { FeedPost } from "./queries";
 
-export function PostCard({ post }: { post: Post }) {
+// Fallback avatar (user images aren't uploaded yet — see auth.user.image).
+const DEFAULT_AVATAR = "/assets/images/post_img.png";
+
+export function PostCard({ post }: { post: FeedPost }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -35,14 +36,19 @@ export function PostCard({ post }: { post: Post }) {
           <div className="_feed_inner_timeline_post_box">
             <div className="_feed_inner_timeline_post_box_image">
               {/* biome-ignore lint/performance/noImgElement: theme markup parity */}
-              <img src={post.avatar} alt="" className="_post_img" />
+              <img
+                src={post.authorImage ?? DEFAULT_AVATAR}
+                alt=""
+                className="_post_img"
+              />
             </div>
             <div className="_feed_inner_timeline_post_box_txt">
               <h4 className="_feed_inner_timeline_post_box_title">
-                {post.author}
+                {post.authorName}
               </h4>
               <p className="_feed_inner_timeline_post_box_para">
-                {post.time} . <a href="#0">{post.audience}</a>
+                {post.time} .{" "}
+                <span>{post.isPrivate ? "Private" : "Public"}</span>
               </p>
             </div>
           </div>
@@ -72,55 +78,24 @@ export function PostCard({ post }: { post: Post }) {
             </div>
           </div>
         </div>
-        <h4 className="_feed_inner_timeline_post_title">{post.title}</h4>
-        <div className="_feed_inner_timeline_image">
-          {/* biome-ignore lint/performance/noImgElement: theme markup parity */}
-          <img src={post.image} alt="" className="_time_img" />
-        </div>
+        <h4 className="_feed_inner_timeline_post_title">{post.body}</h4>
+        {post.imageUrl ? (
+          <div className="_feed_inner_timeline_image">
+            {/* biome-ignore lint/performance/noImgElement: theme markup parity */}
+            <img src={post.imageUrl} alt="" className="_time_img" />
+          </div>
+        ) : null}
       </div>
 
       <div className="_feed_inner_timeline_total_reacts _padd_r24 _padd_l24 _mar_b26">
         <div className="_feed_inner_timeline_total_reacts_image">
-          {/* biome-ignore lint/performance/noImgElement: theme markup parity */}
-          <img
-            src="/assets/images/react_img1.png"
-            alt=""
-            className="_react_img1"
-          />
-          {/* biome-ignore lint/performance/noImgElement: theme markup parity */}
-          <img
-            src="/assets/images/react_img2.png"
-            alt=""
-            className="_react_img"
-          />
-          {/* biome-ignore lint/performance/noImgElement: theme markup parity */}
-          <img
-            src="/assets/images/react_img3.png"
-            alt=""
-            className="_react_img _rect_img_mbl_none"
-          />
-          {/* biome-ignore lint/performance/noImgElement: theme markup parity */}
-          <img
-            src="/assets/images/react_img4.png"
-            alt=""
-            className="_react_img _rect_img_mbl_none"
-          />
-          {/* biome-ignore lint/performance/noImgElement: theme markup parity */}
-          <img
-            src="/assets/images/react_img5.png"
-            alt=""
-            className="_react_img _rect_img_mbl_none"
-          />
-          <p className="_feed_inner_timeline_total_reacts_para">9+</p>
+          <p className="_feed_inner_timeline_total_reacts_para">
+            {post.likeCount}
+          </p>
         </div>
         <div className="_feed_inner_timeline_total_reacts_txt">
           <p className="_feed_inner_timeline_total_reacts_para1">
-            <a href="#0">
-              <span>{post.comments}</span> Comment
-            </a>
-          </p>
-          <p className="_feed_inner_timeline_total_reacts_para2">
-            <span>{post.shares}</span> Share
+            <span>{post.commentCount}</span> Comment
           </p>
         </div>
       </div>
@@ -128,12 +103,12 @@ export function PostCard({ post }: { post: Post }) {
       <div className="_feed_inner_timeline_reaction">
         <button
           type="button"
-          className="_feed_inner_timeline_reaction_emoji _feed_reaction _feed_reaction_active"
+          className="_feed_inner_timeline_reaction_emoji _feed_reaction"
         >
           <span className="_feed_inner_timeline_reaction_link">
             <span>
               <HahaEmoji />
-              Haha
+              Like
             </span>
           </span>
         </button>
@@ -163,76 +138,6 @@ export function PostCard({ post }: { post: Post }) {
 
       <div className="_feed_inner_timeline_cooment_area">
         <CommentBox avatar="/assets/images/comment_img.png" />
-      </div>
-
-      <div className="_timline_comment_main">
-        <div className="_previous_comment">
-          <button type="button" className="_previous_comment_txt">
-            View {post.previousComments} previous comments
-          </button>
-        </div>
-        <div className="_comment_main">
-          <div className="_comment_image">
-            <a href="#0" className="_comment_image_link">
-              {/* biome-ignore lint/performance/noImgElement: theme markup parity */}
-              <img
-                src={post.topComment.avatar}
-                alt=""
-                className="_comment_img1"
-              />
-            </a>
-          </div>
-          <div className="_comment_area">
-            <div className="_comment_details">
-              <div className="_comment_details_top">
-                <div className="_comment_name">
-                  <a href="#0">
-                    <h4 className="_comment_name_title">
-                      {post.topComment.author}
-                    </h4>
-                  </a>
-                </div>
-              </div>
-              <div className="_comment_status">
-                <p className="_comment_status_text">
-                  <span>{post.topComment.text}</span>
-                </p>
-              </div>
-              <div className="_total_reactions">
-                <div className="_total_react">
-                  <span className="_reaction_like">
-                    <ThumbsUpIcon />
-                  </span>
-                  <span className="_reaction_heart">
-                    <HeartIcon />
-                  </span>
-                </div>
-                <span className="_total">{post.topComment.reactions}</span>
-              </div>
-              <div className="_comment_reply">
-                <div className="_comment_reply_num">
-                  <ul className="_comment_reply_list">
-                    <li>
-                      <span>Like.</span>
-                    </li>
-                    <li>
-                      <span>Reply.</span>
-                    </li>
-                    <li>
-                      <span>Share</span>
-                    </li>
-                    <li>
-                      <span className="_time_link">
-                        .{post.topComment.time}
-                      </span>
-                    </li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-            <CommentBox avatar="/assets/images/comment_img.png" />
-          </div>
-        </div>
       </div>
     </div>
   );

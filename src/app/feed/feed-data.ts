@@ -21,28 +21,6 @@ export type Friend = Person & {
   lastSeen?: string;
 };
 
-export type Comment = {
-  author: string;
-  avatar: string;
-  text: string;
-  reactions: number;
-  time: string;
-};
-
-export type Post = {
-  id: string;
-  author: string;
-  avatar: string;
-  time: string;
-  audience: string;
-  title: string;
-  image: string;
-  comments: number;
-  shares: number;
-  previousComments: number;
-  topComment: Comment;
-};
-
 export const stories: Story[] = [
   {
     name: "Ryan Roslansky",
@@ -138,42 +116,5 @@ export const friends: Friend[] = [
     image: "/assets/images/people1.png",
     status: "offline",
     lastSeen: "5 minute ago",
-  },
-];
-
-const topComment: Comment = {
-  author: "Radovan SkillArena",
-  avatar: "/assets/images/txt_img.png",
-  text: "It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout.",
-  reactions: 198,
-  time: "21m",
-};
-
-export const posts: Post[] = [
-  {
-    id: "1",
-    author: "Karim Saif",
-    avatar: "/assets/images/post_img.png",
-    time: "5 minute ago",
-    audience: "Public",
-    title: "-Healthy Tracking App",
-    image: "/assets/images/timeline_img.png",
-    comments: 12,
-    shares: 122,
-    previousComments: 4,
-    topComment,
-  },
-  {
-    id: "2",
-    author: "Karim Saif",
-    avatar: "/assets/images/post_img.png",
-    time: "5 minute ago",
-    audience: "Public",
-    title: "-Healthy Tracking App",
-    image: "/assets/images/timeline_img.png",
-    comments: 12,
-    shares: 122,
-    previousComments: 4,
-    topComment,
   },
 ];
