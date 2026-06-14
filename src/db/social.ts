@@ -2,12 +2,14 @@ import { desc, relations, sql } from "drizzle-orm";
 import {
   type AnyPgColumn,
   boolean,
+  check,
   index,
   integer,
   pgTable,
   primaryKey,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 import { uuidv7 } from "uuidv7";
@@ -43,7 +45,55 @@ export const posts = pgTable(
     index("posts_author_id_idx")
       .on(table.authorId)
       .where(sql`${table.authorId} is not null`),
+    // A published object belongs to one post. NULL remains valid for text-only posts.
+    uniqueIndex("posts_image_url_unique_idx")
+      .on(table.imageUrl)
+      .where(sql`${table.imageUrl} is not null`),
   ],
+);
+
+export const imageUploads = pgTable(
+  "image_uploads",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .$defaultFn(() => uuidv7()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    pendingObjectKey: text("pending_object_key").notNull().unique(),
+    publishedObjectKey: text("published_object_key").notNull().unique(),
+    publicUrl: text("public_url").notNull().unique(),
+    contentType: text("content_type").notNull(),
+    expectedSize: integer("expected_size").notNull(),
+    status: text("status").default("pending").notNull(),
+    attachedPostId: uuid("attached_post_id").unique(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    expiresAt: timestamp("expires_at").notNull(),
+    verifiedAt: timestamp("verified_at"),
+  },
+  (table) => [
+    index("image_uploads_user_created_idx").on(table.userId, table.createdAt),
+    index("image_uploads_expires_idx").on(table.expiresAt),
+    check(
+      "image_uploads_status_check",
+      sql`${table.status} in ('pending', 'processing', 'attached', 'rejected')`,
+    ),
+    check(
+      "image_uploads_expected_size_check",
+      sql`${table.expectedSize} > 0 and ${table.expectedSize} <= 5242880`,
+    ),
+  ],
+);
+
+export const rateLimitBuckets = pgTable(
+  "rate_limit_buckets",
+  {
+    key: text("key").primaryKey(),
+    count: integer("count").default(1).notNull(),
+    expiresAt: timestamp("expires_at").notNull(),
+  },
+  (table) => [index("rate_limit_buckets_expires_idx").on(table.expiresAt)],
 );
 
 export const comments = pgTable(
