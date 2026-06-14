@@ -18,6 +18,7 @@ import { formatRelativeTime } from "@/lib/relative-time";
 
 export const FEED_PAGE_SIZE = 20;
 export const COMMENT_PAGE_SIZE = 10;
+export const REPLY_PAGE_SIZE = 5;
 
 // Keyset (not OFFSET) cursor: the created_at + id of the last row returned. The
 // feed orders by created_at DESC, so id alone isn't a sufficient keyset — id is
@@ -30,10 +31,13 @@ export type CommentCursor = { createdAt: string; id: string };
 export type FeedComment = {
   id: string;
   postId: string;
+  parentId: string | null;
   authorName: string;
   authorImage: string | null;
   body: string;
   time: string;
+  replies: FeedComment[];
+  nextReplyCursor: CommentCursor | null;
 };
 
 export type FeedPost = {
@@ -61,9 +65,15 @@ export type CommentPage = {
   nextCursor: CommentCursor | null;
 };
 
+export type ReplyPage = {
+  replies: FeedComment[];
+  nextCursor: CommentCursor | null;
+};
+
 function toFeedComment(row: {
   id: string;
   postId: string;
+  parentId: string | null;
   body: string;
   createdAt: Date;
   authorName: string | null;
@@ -72,11 +82,84 @@ function toFeedComment(row: {
   return {
     id: row.id,
     postId: row.postId,
+    parentId: row.parentId,
     authorName: row.authorName ?? "[deleted user]",
     authorImage: row.authorImage,
     body: row.body,
     time: formatRelativeTime(row.createdAt),
+    replies: [],
+    nextReplyCursor: null,
   };
+}
+
+async function getRepliesByParentIds(parentIds: string[]) {
+  const rankedReplies = db
+    .select({
+      id: comments.id,
+      postId: comments.postId,
+      parentId: comments.parentId,
+      authorId: comments.authorId,
+      body: comments.body,
+      createdAt: comments.createdAt,
+      createdAtCursor:
+        sql<string>`to_char(${comments.createdAt}, 'YYYY-MM-DD"T"HH24:MI:SS.US')`.as(
+          "created_at_cursor",
+        ),
+      rank: sql<number>`row_number() over (
+        partition by ${comments.parentId}
+        order by ${comments.createdAt} asc, ${comments.id} asc
+      )`.as("reply_rank"),
+    })
+    .from(comments)
+    .where(
+      and(inArray(comments.parentId, parentIds), isNull(comments.deletedAt)),
+    )
+    .as("ranked_replies");
+  const rows = parentIds.length
+    ? await db
+        .select({
+          id: rankedReplies.id,
+          postId: rankedReplies.postId,
+          parentId: rankedReplies.parentId,
+          body: rankedReplies.body,
+          createdAt: rankedReplies.createdAt,
+          createdAtCursor: rankedReplies.createdAtCursor,
+          authorName: user.name,
+          authorImage: user.image,
+        })
+        .from(rankedReplies)
+        .leftJoin(user, eq(rankedReplies.authorId, user.id))
+        .where(lte(rankedReplies.rank, REPLY_PAGE_SIZE + 1))
+        .orderBy(
+          asc(rankedReplies.parentId),
+          asc(rankedReplies.createdAt),
+          asc(rankedReplies.id),
+        )
+    : [];
+
+  const rowsByParent = new Map<string, typeof rows>();
+  for (const row of rows) {
+    if (!row.parentId) continue;
+    const parentRows = rowsByParent.get(row.parentId) ?? [];
+    parentRows.push(row);
+    rowsByParent.set(row.parentId, parentRows);
+  }
+
+  const repliesByParent = new Map<string, ReplyPage>();
+  for (const parentId of parentIds) {
+    const parentRows = rowsByParent.get(parentId) ?? [];
+    const hasMore = parentRows.length > REPLY_PAGE_SIZE;
+    const page = hasMore ? parentRows.slice(0, REPLY_PAGE_SIZE) : parentRows;
+    const last = page.at(-1);
+    repliesByParent.set(parentId, {
+      replies: page.map(toFeedComment),
+      nextCursor:
+        hasMore && last
+          ? { createdAt: last.createdAtCursor, id: last.id }
+          : null,
+    });
+  }
+  return repliesByParent;
 }
 
 // Visible posts for `viewerId`: anything public, plus the viewer's own private
@@ -136,6 +219,7 @@ export async function getFeedPage(
     .select({
       id: comments.id,
       postId: comments.postId,
+      parentId: comments.parentId,
       authorId: comments.authorId,
       body: comments.body,
       createdAt: comments.createdAt,
@@ -162,6 +246,7 @@ export async function getFeedPage(
         .select({
           id: rankedComments.id,
           postId: rankedComments.postId,
+          parentId: rankedComments.parentId,
           body: rankedComments.body,
           createdAt: rankedComments.createdAt,
           createdAtCursor: rankedComments.createdAtCursor,
@@ -184,6 +269,12 @@ export async function getFeedPage(
     list.push(comment);
     commentRowsByPost.set(comment.postId, list);
   }
+  const visibleCommentRows = [...commentRowsByPost.values()].flatMap((rows) =>
+    rows.slice(0, COMMENT_PAGE_SIZE),
+  );
+  const repliesByParent = await getRepliesByParentIds(
+    visibleCommentRows.map((comment) => comment.id),
+  );
 
   return {
     posts: page.map((r) => ({
@@ -199,7 +290,11 @@ export async function getFeedPage(
       commentCount: r.commentCount,
       comments: (commentRowsByPost.get(r.id) ?? [])
         .slice(0, COMMENT_PAGE_SIZE)
-        .map(toFeedComment),
+        .map((comment) => ({
+          ...toFeedComment(comment),
+          replies: repliesByParent.get(comment.id)?.replies ?? [],
+          nextReplyCursor: repliesByParent.get(comment.id)?.nextCursor ?? null,
+        })),
       nextCommentCursor: (() => {
         const postComments = commentRowsByPost.get(r.id) ?? [];
         const cursorComment = postComments[COMMENT_PAGE_SIZE - 1];
@@ -252,6 +347,7 @@ export async function getCommentsPage(
     .select({
       id: comments.id,
       postId: comments.postId,
+      parentId: comments.parentId,
       body: comments.body,
       createdAt: comments.createdAt,
       createdAtCursor: sql<string>`to_char(${comments.createdAt}, 'YYYY-MM-DD"T"HH24:MI:SS.US')`,
@@ -267,9 +363,72 @@ export async function getCommentsPage(
   const hasMore = rows.length > COMMENT_PAGE_SIZE;
   const page = hasMore ? rows.slice(0, COMMENT_PAGE_SIZE) : rows;
   const last = page.at(-1);
+  const repliesByParent = await getRepliesByParentIds(
+    page.map((comment) => comment.id),
+  );
 
   return {
-    comments: page.map(toFeedComment),
+    comments: page.map((comment) => ({
+      ...toFeedComment(comment),
+      replies: repliesByParent.get(comment.id)?.replies ?? [],
+      nextReplyCursor: repliesByParent.get(comment.id)?.nextCursor ?? null,
+    })),
+    nextCursor:
+      hasMore && last ? { createdAt: last.createdAtCursor, id: last.id } : null,
+  };
+}
+
+export async function getRepliesPage(
+  viewerId: string,
+  postId: string,
+  parentId: string,
+  cursor?: CommentCursor,
+): Promise<ReplyPage> {
+  const conditions: SQL[] = [
+    eq(comments.postId, postId),
+    eq(comments.parentId, parentId),
+    isNull(comments.deletedAt),
+    sql`exists (
+      select 1 from ${comments} parent
+      inner join ${posts} on ${posts.id} = parent.post_id
+      where parent.id = ${parentId}
+        and parent.post_id = ${postId}
+        and parent.parent_id is null
+        and parent.deleted_at is null
+        and ${posts.deletedAt} is null
+        and (${posts.isPrivate} = false or ${posts.authorId} = ${viewerId})
+    )`,
+  ];
+
+  if (cursor) {
+    conditions.push(
+      sql`(${comments.createdAt}, ${comments.id}) > (${cursor.createdAt}::timestamp, ${cursor.id}::uuid)`,
+    );
+  }
+
+  const rows = await db
+    .select({
+      id: comments.id,
+      postId: comments.postId,
+      parentId: comments.parentId,
+      body: comments.body,
+      createdAt: comments.createdAt,
+      createdAtCursor: sql<string>`to_char(${comments.createdAt}, 'YYYY-MM-DD"T"HH24:MI:SS.US')`,
+      authorName: user.name,
+      authorImage: user.image,
+    })
+    .from(comments)
+    .leftJoin(user, eq(comments.authorId, user.id))
+    .where(and(...conditions))
+    .orderBy(asc(comments.createdAt), asc(comments.id))
+    .limit(REPLY_PAGE_SIZE + 1);
+
+  const hasMore = rows.length > REPLY_PAGE_SIZE;
+  const page = hasMore ? rows.slice(0, REPLY_PAGE_SIZE) : rows;
+  const last = page.at(-1);
+
+  return {
+    replies: page.map(toFeedComment),
     nextCursor:
       hasMore && last ? { createdAt: last.createdAtCursor, id: last.id } : null,
   };

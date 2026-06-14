@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { loadMoreComments, toggleLike } from "./actions";
+import { loadMoreComments, loadMoreReplies, toggleLike } from "./actions";
 import { CommentBox } from "./comment-box";
 import {
   CommentIcon,
@@ -61,7 +61,11 @@ export function PostCard({ post }: { post: FeedPost }) {
 
   function handleCommentCreated(comment: FeedComment, nextCount: number) {
     setNewComments((prev) => [...prev, comment]);
-    setCommentCount(nextCount);
+    reconcileCommentCount(nextCount);
+  }
+
+  function reconcileCommentCount(nextCount: number) {
+    setCommentCount((current) => Math.max(current, nextCount));
   }
 
   function handleLoadMoreComments() {
@@ -209,7 +213,11 @@ export function PostCard({ post }: { post: FeedPost }) {
 
       <div className="_feed_inner_timeline_cooment_area">
         {loadedComments.map((comment) => (
-          <CommentRow key={comment.id} comment={comment} />
+          <CommentRow
+            key={comment.id}
+            comment={comment}
+            onReplyCreated={reconcileCommentCount}
+          />
         ))}
         {nextCommentCursor ? (
           <button
@@ -238,7 +246,11 @@ export function PostCard({ post }: { post: FeedPost }) {
           </p>
         ) : null}
         {newComments.map((comment) => (
-          <CommentRow key={comment.id} comment={comment} />
+          <CommentRow
+            key={comment.id}
+            comment={comment}
+            onReplyCreated={reconcileCommentCount}
+          />
         ))}
         <CommentBox
           avatar="/assets/images/comment_img.png"
@@ -250,13 +262,141 @@ export function PostCard({ post }: { post: FeedPost }) {
   );
 }
 
-function CommentRow({ comment }: { comment: FeedComment }) {
+function CommentRow({
+  comment,
+  onReplyCreated,
+}: {
+  comment: FeedComment;
+  onReplyCreated: (commentCount: number) => void;
+}) {
+  const [replying, setReplying] = useState(false);
+  const [replies, setReplies] = useState(comment.replies);
+  const [nextReplyCursor, setNextReplyCursor] = useState(
+    comment.nextReplyCursor,
+  );
+  const [replyLoadError, setReplyLoadError] = useState<string | null>(null);
+  const [isLoadingReplies, startLoadReplies] = useTransition();
+
+  function handleReplyCreated(reply: FeedComment, commentCount: number) {
+    setReplies((current) => [...current, reply]);
+    setReplying(false);
+    onReplyCreated(commentCount);
+  }
+
+  function handleLoadMoreReplies() {
+    if (!nextReplyCursor) return;
+
+    setReplyLoadError(null);
+    startLoadReplies(async () => {
+      try {
+        const result = await loadMoreReplies({
+          postId: comment.postId,
+          parentId: comment.id,
+          cursor: nextReplyCursor,
+        });
+        if (result.ok) {
+          setReplies((current) => {
+            const existingIds = new Set(current.map((reply) => reply.id));
+            return [
+              ...current,
+              ...result.page.replies.filter(
+                (reply) => !existingIds.has(reply.id),
+              ),
+            ];
+          });
+          setNextReplyCursor(result.page.nextCursor);
+        } else {
+          setReplyLoadError(result.error);
+        }
+      } catch {
+        setReplyLoadError("Could not load more replies.");
+      }
+    });
+  }
+
+  return (
+    <div className="_mar_b16">
+      <div className="_comment_main">
+        <div className="_comment_image">
+          {/* biome-ignore lint/performance/noImgElement: theme markup parity */}
+          <img
+            src={comment.authorImage ?? DEFAULT_AVATAR}
+            alt=""
+            className="_comment_img1"
+          />
+        </div>
+        <div className="_comment_area">
+          <div className="_comment_details" style={{ margin: "0 0 8px" }}>
+            <div className="_comment_details_top">
+              <div className="_comment_name">
+                <h4 className="_comment_name_title">{comment.authorName}</h4>
+                <p className="_comment_status_text">{comment.body}</p>
+              </div>
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 12, margin: "0 0 12px" }}>
+            <p className="_feed_inner_timeline_post_box_para">{comment.time}</p>
+            <button
+              type="button"
+              onClick={() => setReplying((current) => !current)}
+              aria-expanded={replying}
+              className="_feed_inner_comment_box_icon_btn"
+              style={{ fontSize: 13, fontWeight: 600, padding: 0 }}
+            >
+              Reply
+            </button>
+          </div>
+        </div>
+      </div>
+      <div style={{ marginLeft: 48 }}>
+        {replies.map((reply) => (
+          <ReplyRow key={reply.id} reply={reply} />
+        ))}
+        {nextReplyCursor ? (
+          <button
+            type="button"
+            onClick={handleLoadMoreReplies}
+            disabled={isLoadingReplies}
+            className="_feed_inner_comment_box_icon_btn"
+            style={{
+              display: "block",
+              fontSize: 13,
+              fontWeight: 600,
+              margin: "0 0 16px 12px",
+              padding: "6px 0",
+            }}
+          >
+            {isLoadingReplies ? "Loading replies..." : "Load more replies"}
+          </button>
+        ) : null}
+        {replyLoadError ? (
+          <p
+            className="_feed_inner_timeline_post_box_para"
+            style={{ color: "#d92d20", margin: "0 0 16px 12px" }}
+          >
+            {replyLoadError}
+          </p>
+        ) : null}
+        {replying ? (
+          <CommentBox
+            avatar="/assets/images/comment_img.png"
+            postId={comment.postId}
+            parentId={comment.id}
+            onCreated={handleReplyCreated}
+          />
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function ReplyRow({ reply }: { reply: FeedComment }) {
   return (
     <div className="_comment_main _mar_b16">
       <div className="_comment_image">
         {/* biome-ignore lint/performance/noImgElement: theme markup parity */}
         <img
-          src={comment.authorImage ?? DEFAULT_AVATAR}
+          src={reply.authorImage ?? DEFAULT_AVATAR}
           alt=""
           className="_comment_img1"
         />
@@ -265,17 +405,12 @@ function CommentRow({ comment }: { comment: FeedComment }) {
         <div className="_comment_details" style={{ margin: "0 0 8px" }}>
           <div className="_comment_details_top">
             <div className="_comment_name">
-              <h4 className="_comment_name_title">{comment.authorName}</h4>
-              <p className="_comment_status_text">{comment.body}</p>
+              <h4 className="_comment_name_title">{reply.authorName}</h4>
+              <p className="_comment_status_text">{reply.body}</p>
             </div>
           </div>
         </div>
-        <p
-          className="_feed_inner_timeline_post_box_para"
-          style={{ margin: "0 0 12px" }}
-        >
-          {comment.time}
-        </p>
+        <p className="_feed_inner_timeline_post_box_para">{reply.time}</p>
       </div>
     </div>
   );

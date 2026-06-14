@@ -7,7 +7,7 @@ import {
   useState,
   useTransition,
 } from "react";
-import { createComment } from "./actions";
+import { createComment, createReply } from "./actions";
 import { AttachIcon, SmileIcon } from "./feed-icons";
 import type { FeedComment } from "./queries";
 
@@ -15,10 +15,12 @@ import type { FeedComment } from "./queries";
 export function CommentBox({
   avatar,
   postId,
+  parentId,
   onCreated,
 }: {
   avatar: string;
   postId: string;
+  parentId?: string;
   onCreated: (comment: FeedComment, commentCount: number) => void;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
@@ -31,18 +33,26 @@ export function CommentBox({
     const nextBody = body.trim();
 
     if (!nextBody) {
-      setError("Write a comment before posting.");
+      setError(
+        parentId
+          ? "Write a reply before posting."
+          : "Write a comment before posting.",
+      );
       return;
     }
     if (nextBody.length > 2000) {
-      setError("Comment must be at most 2,000 characters.");
+      setError(
+        `${parentId ? "Reply" : "Comment"} must be at most 2,000 characters.`,
+      );
       return;
     }
 
     setError(null);
     startTransition(async () => {
       try {
-        const result = await createComment({ postId, body: nextBody });
+        const result = parentId
+          ? await createReply({ postId, parentId, body: nextBody })
+          : await createComment({ postId, body: nextBody });
         if (result.ok) {
           setBody("");
           onCreated(result.comment, result.commentCount);
@@ -50,7 +60,9 @@ export function CommentBox({
           setError(result.error);
         }
       } catch {
-        setError("Could not post comment. Please try again.");
+        setError(
+          `Could not post ${parentId ? "reply" : "comment"}. Please try again.`,
+        );
       }
     });
   }
@@ -77,7 +89,8 @@ export function CommentBox({
           <div className="_feed_inner_comment_box_content_txt">
             <textarea
               className="form-control _comment_textarea"
-              placeholder="Write a comment"
+              placeholder={parentId ? "Write a reply" : "Write a comment"}
+              aria-label={parentId ? "Write a reply" : "Write a comment"}
               maxLength={2000}
               value={body}
               onChange={(event) => setBody(event.target.value)}
@@ -99,7 +112,7 @@ export function CommentBox({
             disabled={isPending}
             style={{ fontSize: 13, fontWeight: 600 }}
           >
-            {isPending ? "Posting" : "Post"}
+            {isPending ? "Posting" : parentId ? "Reply" : "Post"}
           </button>
         </div>
       </form>

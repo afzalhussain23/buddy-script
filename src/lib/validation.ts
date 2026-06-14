@@ -4,6 +4,7 @@ export const MAX_NAME_LENGTH = 100;
 export const MAX_EMAIL_LENGTH = 254;
 export const MIN_PASSWORD_LENGTH = 8;
 export const MAX_PASSWORD_LENGTH = 128;
+export const MAX_COMMENT_LENGTH = 2000;
 
 export const signUpSchema = z.object({
   firstName: z
@@ -70,3 +71,18 @@ export const signInSchema = z.object({
 });
 
 export type SignInInput = z.infer<typeof signInSchema>;
+
+export const createReplySchema = z.object({
+  postId: z.uuid("Invalid post."),
+  parentId: z.uuid("Invalid parent comment."),
+  body: z
+    .string()
+    .trim()
+    .min(1, "Write a reply before posting.")
+    .max(
+      MAX_COMMENT_LENGTH,
+      `Reply must be at most ${MAX_COMMENT_LENGTH.toLocaleString()} characters.`,
+    ),
+});
+
+export type CreateReplyInput = z.infer<typeof createReplySchema>;

@@ -15,6 +15,7 @@ import {
 } from "@/lib/r2";
 import { consumeRateLimit } from "@/lib/rate-limit";
 import { formatRelativeTime } from "@/lib/relative-time";
+import { createReplySchema } from "@/lib/validation";
 import {
   type CommentCursor,
   type CommentPage,
@@ -24,6 +25,8 @@ import {
   type FeedPost,
   getCommentsPage,
   getFeedPage,
+  getRepliesPage,
+  type ReplyPage,
 } from "./queries";
 
 type CreatePostResult =
@@ -343,10 +346,103 @@ export async function createComment(input: {
     comment: {
       id: row.id,
       postId: row.post_id,
+      parentId: null,
       authorName: session.user.name,
       authorImage: session.user.image ?? null,
       body: row.body,
       time: formatRelativeTime(new Date()),
+      replies: [],
+      nextReplyCursor: null,
+    },
+    commentCount: Number(row.comment_count),
+  };
+}
+
+export async function createReply(
+  input: unknown,
+): Promise<CreateCommentResult> {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session) return { ok: false, error: "Authentication required." };
+
+  const parsed = createReplySchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: parsed.error.issues[0]?.message ?? "Invalid reply data.",
+    };
+  }
+
+  const { postId, parentId, body } = parsed.data;
+  const userId = session.user.id;
+  const rateLimit = await consumeRateLimit({
+    action: "create-comment",
+    identifier: userId,
+    limit: COMMENT_LIMIT,
+    windowMs: COMMENT_LIMIT_WINDOW_MS,
+  });
+  if (!rateLimit.allowed) {
+    return { ok: false, error: "Too many comments. Please try again shortly." };
+  }
+
+  const replyId = uuidv7();
+  const result = await db.execute<{
+    id: string;
+    post_id: string;
+    parent_id: string;
+    body: string;
+    created_at: string | Date;
+    comment_count: number;
+  }>(sql`
+    with target as (
+      select ${comments.id}, ${comments.postId}
+      from ${comments}
+      inner join ${posts} on ${posts.id} = ${comments.postId}
+      where ${comments.id} = ${parentId}
+        and ${comments.postId} = ${postId}
+        and ${comments.parentId} is null
+        and ${comments.deletedAt} is null
+        and ${posts.deletedAt} is null
+        and (${posts.isPrivate} = false or ${posts.authorId} = ${userId})
+    ),
+    inserted as (
+      insert into ${comments} (id, post_id, author_id, parent_id, body)
+      select ${replyId}, target.post_id, ${userId}, target.id, ${body}
+      from target
+      returning id, post_id, parent_id, body, created_at
+    ),
+    updated as (
+      update ${posts}
+      set comment_count = comment_count + (select count(*) from inserted)
+      where ${posts.id} = ${postId} and exists (select 1 from inserted)
+      returning comment_count
+    )
+    select inserted.id,
+      inserted.post_id,
+      inserted.parent_id,
+      inserted.body,
+      inserted.created_at,
+      updated.comment_count
+    from inserted cross join updated
+  `);
+
+  const row = result.rows[0];
+  if (!row) {
+    return { ok: false, error: "Parent comment not found." };
+  }
+
+  revalidatePath("/feed");
+  return {
+    ok: true,
+    comment: {
+      id: row.id,
+      postId: row.post_id,
+      parentId: row.parent_id,
+      authorName: session.user.name,
+      authorImage: session.user.image ?? null,
+      body: row.body,
+      time: formatRelativeTime(new Date(row.created_at)),
+      replies: [],
+      nextReplyCursor: null,
     },
     commentCount: Number(row.comment_count),
   };
@@ -384,5 +480,39 @@ export async function loadMoreComments(input: {
   return {
     ok: true,
     page: await getCommentsPage(session.user.id, input.postId, input.cursor),
+  };
+}
+
+type LoadMoreRepliesResult =
+  | { ok: true; page: ReplyPage }
+  | { ok: false; error: string };
+
+export async function loadMoreReplies(input: {
+  postId: string;
+  parentId: string;
+  cursor: CommentCursor;
+}): Promise<LoadMoreRepliesResult> {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session) return { ok: false, error: "Authentication required." };
+
+  if (
+    !input ||
+    typeof input.postId !== "string" ||
+    typeof input.parentId !== "string" ||
+    !input.cursor ||
+    typeof input.cursor.id !== "string" ||
+    typeof input.cursor.createdAt !== "string"
+  ) {
+    return { ok: false, error: "Invalid reply cursor." };
+  }
+
+  return {
+    ok: true,
+    page: await getRepliesPage(
+      session.user.id,
+      input.postId,
+      input.parentId,
+      input.cursor,
+    ),
   };
 }
