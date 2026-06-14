@@ -1,11 +1,10 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { CreatePost } from "./create-post";
 import { DarkModeToggle } from "./dark-mode-toggle";
 import { friends, stories, suggestedPeople, youMightLike } from "./feed-data";
 import { FeedNav } from "./feed-nav";
-import { FeedPosts } from "./feed-posts";
+import { FeedTimeline } from "./feed-timeline";
 import { getFeedPage } from "./queries";
 
 export default async function FeedPage() {
@@ -258,12 +257,8 @@ export default async function FeedPage() {
                       </div>
                     </div>
 
-                    {/* Create post */}
-                    <CreatePost />
-
-                    {/* Posts */}
-                    <FeedPosts
-                      key={posts[0]?.id ?? "empty-feed"}
+                    {/* Create post + timeline */}
+                    <FeedTimeline
                       initialPosts={posts}
                       initialCursor={nextCursor}
                     />

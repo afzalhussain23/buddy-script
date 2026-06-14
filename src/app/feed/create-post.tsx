@@ -3,8 +3,13 @@
 import { useRef, useState, useTransition } from "react";
 import { MAX_IMAGE_UPLOAD_BYTES, uploadImageToR2 } from "@/lib/image-upload";
 import { createPost } from "./actions";
+import type { FeedPost } from "./queries";
 
-export function CreatePost() {
+export function CreatePost({
+  onCreated,
+}: {
+  onCreated: (post: FeedPost) => void;
+}) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [body, setBody] = useState("");
   const [image, setImage] = useState<File | null>(null);
@@ -32,6 +37,7 @@ export function CreatePost() {
           setError(result.error);
           return;
         }
+        onCreated(result.post);
         setBody("");
         setImage(null);
         if (fileInputRef.current) fileInputRef.current.value = "";

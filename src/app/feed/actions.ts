@@ -14,11 +14,38 @@ import {
   verifyAndPublishImageUpload,
 } from "@/lib/r2";
 import { consumeRateLimit } from "@/lib/rate-limit";
-import { type FeedCursor, type FeedPage, getFeedPage } from "./queries";
+import { formatRelativeTime } from "@/lib/relative-time";
+import {
+  type FeedCursor,
+  type FeedPage,
+  type FeedPost,
+  getFeedPage,
+} from "./queries";
 
-type CreatePostResult = { ok: true } | { ok: false; error: string };
+type CreatePostResult =
+  | { ok: true; post: FeedPost }
+  | { ok: false; error: string };
 const POST_LIMIT = 20;
 const POST_LIMIT_WINDOW_MS = 10 * 60 * 1000;
+
+// Shape a freshly-inserted row into a FeedPost so the client can render it
+// without a round-trip. The author is always the current session user.
+function toFeedPost(
+  row: typeof posts.$inferSelect,
+  author: { name: string; image?: string | null },
+): FeedPost {
+  return {
+    id: row.id,
+    authorName: author.name,
+    authorImage: author.image ?? null,
+    body: row.body,
+    imageUrl: row.imageUrl,
+    isPrivate: row.isPrivate,
+    likeCount: row.likeCount,
+    commentCount: row.commentCount,
+    time: formatRelativeTime(row.createdAt),
+  };
+}
 
 export async function createPost(input: {
   body: string;
@@ -53,9 +80,12 @@ export async function createPost(input: {
   }
 
   if (!input.uploadId) {
-    await db.insert(posts).values({ authorId: session.user.id, body });
+    const [row] = await db
+      .insert(posts)
+      .values({ authorId: session.user.id, body })
+      .returning();
     revalidatePath("/feed");
-    return { ok: true };
+    return { ok: true, post: toFeedPost(row, session.user) };
   }
 
   const [upload] = await db
@@ -97,14 +127,18 @@ export async function createPost(input: {
   }
 
   const postId = uuidv7();
+  let createdRow: typeof posts.$inferSelect;
   try {
-    await db.batch([
-      db.insert(posts).values({
-        id: postId,
-        authorId: session.user.id,
-        body,
-        imageUrl: upload.publicUrl,
-      }),
+    const [[insertedRow]] = await db.batch([
+      db
+        .insert(posts)
+        .values({
+          id: postId,
+          authorId: session.user.id,
+          body,
+          imageUrl: upload.publicUrl,
+        })
+        .returning(),
       db
         .update(imageUploads)
         .set({
@@ -119,6 +153,7 @@ export async function createPost(input: {
           ),
         ),
     ]);
+    createdRow = insertedRow;
   } catch (error) {
     await Promise.allSettled([
       deleteR2Object(upload.publishedObjectKey),
@@ -135,7 +170,7 @@ export async function createPost(input: {
     console.error("Failed to delete attached pending R2 object", error);
   });
   revalidatePath("/feed");
-  return { ok: true };
+  return { ok: true, post: toFeedPost(createdRow, session.user) };
 }
 
 export async function loadMorePosts(cursor: FeedCursor): Promise<FeedPage> {

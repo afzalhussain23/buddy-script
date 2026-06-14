@@ -2,10 +2,14 @@
 
 import { useState, useTransition } from "react";
 import { loadMorePosts } from "./actions";
+import { CreatePost } from "./create-post";
 import { PostCard } from "./post-card";
 import type { FeedCursor, FeedPost } from "./queries";
 
-export function FeedPosts({
+// Owns the timeline list so a newly created post (from the sibling CreatePost)
+// can be prepended into client state immediately — without waiting for a full
+// page reload. Server revalidation still keeps the list fresh on the next load.
+export function FeedTimeline({
   initialPosts,
   initialCursor,
 }: {
@@ -16,6 +20,10 @@ export function FeedPosts({
   const [cursor, setCursor] = useState(initialCursor);
   const [isPending, startTransition] = useTransition();
 
+  function handleCreated(post: FeedPost) {
+    setPosts((prev) => [post, ...prev]);
+  }
+
   function handleLoadMore() {
     if (!cursor) return;
     startTransition(async () => {
@@ -25,21 +33,22 @@ export function FeedPosts({
     });
   }
 
-  if (posts.length === 0) {
-    return (
-      <div className="_feed_inner_timeline_post_area _b_radious6 _padd_b24 _padd_t24 _padd_r24 _padd_l24 _mar_b16">
-        <p className="_feed_inner_timeline_post_box_para" style={{ margin: 0 }}>
-          No posts yet. Be the first to share something.
-        </p>
-      </div>
-    );
-  }
-
   return (
     <>
-      {posts.map((post) => (
-        <PostCard key={post.id} post={post} />
-      ))}
+      <CreatePost onCreated={handleCreated} />
+
+      {posts.length === 0 ? (
+        <div className="_feed_inner_timeline_post_area _b_radious6 _padd_b24 _padd_t24 _padd_r24 _padd_l24 _mar_b16">
+          <p
+            className="_feed_inner_timeline_post_box_para"
+            style={{ margin: 0 }}
+          >
+            No posts yet. Be the first to share something.
+          </p>
+        </div>
+      ) : (
+        posts.map((post) => <PostCard key={post.id} post={post} />)
+      )}
 
       {cursor ? (
         <div

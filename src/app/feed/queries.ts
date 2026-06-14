@@ -6,11 +6,12 @@ import { formatRelativeTime } from "@/lib/relative-time";
 
 export const FEED_PAGE_SIZE = 20;
 
-// Keyset (not OFFSET) cursor: the id of the last row returned. id is a uuidv7,
-// so its lexical order tracks creation order — it's a sufficient, single-column
-// keyset, and unlike a created_at timestamp it survives the server-action
-// boundary without lossy precision rounding. A plain value for serialization.
-export type FeedCursor = { id: string };
+// Keyset (not OFFSET) cursor: the created_at + id of the last row returned. The
+// feed orders by created_at DESC, so id alone isn't a sufficient keyset — id is
+// only the tiebreaker for rows sharing a timestamp. created_at is serialized as an
+// ISO string to survive the server-action boundary; the column is millisecond
+// precision so the value round-trips exactly (see posts.createdAt).
+export type FeedCursor = { createdAt: string; id: string };
 
 export type FeedPost = {
   id: string;
@@ -30,8 +31,8 @@ export type FeedPage = {
 };
 
 // Visible posts for `viewerId`: anything public, plus the viewer's own private
-// posts. Ordered id DESC to match the partial feed index, with keyset
-// pagination driven by `cursor`.
+// posts. Ordered created_at DESC, id DESC to match the partial feed index, with
+// keyset pagination driven by `cursor`.
 export async function getFeedPage(
   viewerId: string,
   cursor?: FeedCursor,
@@ -42,8 +43,14 @@ export async function getFeedPage(
   ];
 
   if (cursor) {
-    // id < cursor.id for DESC ordering.
-    conditions.push(lt(posts.id, cursor.id));
+    // (created_at, id) < (cursor.createdAt, cursor.id) for DESC ordering.
+    const cursorDate = new Date(cursor.createdAt);
+    conditions.push(
+      or(
+        lt(posts.createdAt, cursorDate),
+        and(eq(posts.createdAt, cursorDate), lt(posts.id, cursor.id)),
+      ),
+    );
   }
 
   // Fetch one extra row to learn whether another page exists, without a COUNT.
@@ -62,7 +69,7 @@ export async function getFeedPage(
     .from(posts)
     .leftJoin(user, eq(posts.authorId, user.id))
     .where(and(...conditions))
-    .orderBy(desc(posts.id))
+    .orderBy(desc(posts.createdAt), desc(posts.id))
     .limit(FEED_PAGE_SIZE + 1);
 
   const hasMore = rows.length > FEED_PAGE_SIZE;
@@ -82,6 +89,9 @@ export async function getFeedPage(
       commentCount: r.commentCount,
       time: formatRelativeTime(r.createdAt),
     })),
-    nextCursor: hasMore && last ? { id: last.id } : null,
+    nextCursor:
+      hasMore && last
+        ? { createdAt: last.createdAt.toISOString(), id: last.id }
+        : null,
   };
 }

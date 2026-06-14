@@ -29,15 +29,20 @@ export const posts = pgTable(
     isPrivate: boolean("is_private").default(false).notNull(),
     likeCount: integer("like_count").default(0).notNull(),
     commentCount: integer("comment_count").default(0).notNull(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
+    // Millisecond precision (not the default microsecond) so a JS Date round-trips
+    // exactly — the feed's keyset cursor compares created_at values, and a ms/µs
+    // mismatch would skip rows at page boundaries.
+    createdAt: timestamp("created_at", { precision: 3 }).defaultNow().notNull(),
     deletedAt: timestamp("deleted_at"),
   },
   (table) => [
-    // Keyset pagination of the feed (ORDER BY id DESC), live posts only. id is a
-    // uuidv7, so id order tracks creation order — a single-column keyset is enough.
-    // Partial on `deleted_at IS NULL` keeps soft-deleted rows out of the hot feed index.
-    index("posts_feed_id_idx")
-      .on(desc(table.id))
+    // Keyset pagination of the feed (ORDER BY created_at DESC, id DESC), live posts
+    // only. Ordering by created_at (not id) keeps "most recent first" correct even
+    // for rows whose id isn't a time-ordered uuidv7 (e.g. seeded v4 UUIDs); id is the
+    // tiebreaker for rows sharing a timestamp. Partial on `deleted_at IS NULL` keeps
+    // soft-deleted rows out of the hot feed index.
+    index("posts_feed_created_idx")
+      .on(desc(table.createdAt), desc(table.id))
       .where(sql`${table.deletedAt} is null`),
     // Speeds the ON DELETE SET NULL lookup and author-filtered reads (own/private posts).
     // Partial: both only query `author_id = <id>` (strict, so excludes NULL), so anonymized
