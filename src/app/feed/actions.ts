@@ -1,11 +1,11 @@
 "use server";
 
-import { and, eq, gt } from "drizzle-orm";
+import { and, eq, gt, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { uuidv7 } from "uuidv7";
 import { db } from "@/db";
-import { imageUploads, posts } from "@/db/social";
+import { imageUploads, postLikes, posts } from "@/db/social";
 import { auth } from "@/lib/auth";
 import {
   deleteR2Object,
@@ -42,6 +42,8 @@ function toFeedPost(
     imageUrl: row.imageUrl,
     isPrivate: row.isPrivate,
     likeCount: row.likeCount,
+    // A just-created post starts unliked, even for its author.
+    likedByMe: false,
     commentCount: row.commentCount,
     time: formatRelativeTime(row.createdAt),
   };
@@ -171,6 +173,84 @@ export async function createPost(input: {
   });
   revalidatePath("/feed");
   return { ok: true, post: toFeedPost(createdRow, session.user) };
+}
+
+type ToggleLikeResult =
+  | { ok: true; liked: boolean; likeCount: number }
+  | { ok: false; error: string };
+
+// Set the viewer's like state for a post to `liked`. Idempotent: the desired
+// end state is passed in (not a blind toggle), so a double-tap or a retried
+// request can't double-count. Each branch is a single atomic statement — the
+// insert/delete of the like row and the posts.like_count adjustment happen in
+// one transaction, and the counter only moves when a row was actually
+// inserted/deleted (count of the CTE), keeping it exact under races.
+export async function toggleLike(input: {
+  postId: string;
+  liked: boolean;
+}): Promise<ToggleLikeResult> {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session) return { ok: false, error: "Authentication required." };
+
+  if (
+    !input ||
+    typeof input.postId !== "string" ||
+    typeof input.liked !== "boolean"
+  ) {
+    return { ok: false, error: "Invalid like data." };
+  }
+
+  const userId = session.user.id;
+  const { postId, liked } = input;
+
+  const result = liked
+    ? await db.execute<{ like_count: number }>(sql`
+        with target as (
+          select 1 from ${posts}
+          where ${posts.id} = ${postId}
+            and ${posts.deletedAt} is null
+            and (${posts.isPrivate} = false or ${posts.authorId} = ${userId})
+        ),
+        ins as (
+          insert into ${postLikes} (user_id, post_id)
+          select ${userId}, ${postId} from target
+          on conflict (user_id, post_id) do nothing
+          returning 1
+        )
+        update ${posts}
+        set like_count = like_count + (select count(*) from ins)
+        where ${posts.id} = ${postId}
+          and ${posts.deletedAt} is null
+          and (${posts.isPrivate} = false or ${posts.authorId} = ${userId})
+        returning like_count
+      `)
+    : await db.execute<{ like_count: number }>(sql`
+        with del as (
+          delete from ${postLikes}
+          where ${postLikes.userId} = ${userId}
+            and ${postLikes.postId} = ${postId}
+            and exists (
+              select 1 from ${posts}
+              where ${posts.id} = ${postId}
+                and ${posts.deletedAt} is null
+                and (${posts.isPrivate} = false or ${posts.authorId} = ${userId})
+            )
+          returning 1
+        )
+        update ${posts}
+        set like_count = greatest(0, like_count - (select count(*) from del))
+        where ${posts.id} = ${postId}
+          and ${posts.deletedAt} is null
+          and (${posts.isPrivate} = false or ${posts.authorId} = ${userId})
+        returning like_count
+      `);
+
+  const row = result.rows[0];
+  if (!row) {
+    return { ok: false, error: "Post not found." };
+  }
+
+  return { ok: true, liked, likeCount: Number(row.like_count) };
 }
 
 export async function loadMorePosts(cursor: FeedCursor): Promise<FeedPage> {

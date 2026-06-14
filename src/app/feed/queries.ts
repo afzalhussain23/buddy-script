@@ -1,7 +1,7 @@
-import { and, desc, eq, isNull, lt, or, type SQL } from "drizzle-orm";
+import { and, desc, eq, isNull, lt, or, type SQL, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { user } from "@/db/auth";
-import { posts } from "@/db/social";
+import { postLikes, posts } from "@/db/social";
 import { formatRelativeTime } from "@/lib/relative-time";
 
 export const FEED_PAGE_SIZE = 20;
@@ -21,6 +21,7 @@ export type FeedPost = {
   imageUrl: string | null;
   isPrivate: boolean;
   likeCount: number;
+  likedByMe: boolean;
   commentCount: number;
   time: string;
 };
@@ -61,6 +62,9 @@ export async function getFeedPage(
       imageUrl: posts.imageUrl,
       isPrivate: posts.isPrivate,
       likeCount: posts.likeCount,
+      // Correlate the viewer's own like row only (the join is keyed on
+      // post_id AND user_id = viewer), so the boolean is per-user.
+      likedByMe: sql<boolean>`${postLikes.userId} is not null`,
       commentCount: posts.commentCount,
       createdAt: posts.createdAt,
       authorName: user.name,
@@ -68,6 +72,10 @@ export async function getFeedPage(
     })
     .from(posts)
     .leftJoin(user, eq(posts.authorId, user.id))
+    .leftJoin(
+      postLikes,
+      and(eq(postLikes.postId, posts.id), eq(postLikes.userId, viewerId)),
+    )
     .where(and(...conditions))
     .orderBy(desc(posts.createdAt), desc(posts.id))
     .limit(FEED_PAGE_SIZE + 1);
@@ -86,6 +94,7 @@ export async function getFeedPage(
       imageUrl: r.imageUrl,
       isPrivate: r.isPrivate,
       likeCount: r.likeCount,
+      likedByMe: r.likedByMe,
       commentCount: r.commentCount,
       time: formatRelativeTime(r.createdAt),
     })),
