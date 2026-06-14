@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { loadMoreComments, loadMoreReplies, toggleLike } from "./actions";
+import {
+  loadMoreComments,
+  loadMoreReplies,
+  toggleCommentLike,
+  toggleLike,
+} from "./actions";
 import { CommentBox } from "./comment-box";
 import {
   CommentIcon,
@@ -9,6 +14,7 @@ import {
   postMenuItems,
   ShareIcon,
   ThreeDotsIcon,
+  ThumbsUpIcon,
 } from "./feed-icons";
 import type { FeedComment, FeedPost } from "./queries";
 
@@ -262,6 +268,67 @@ export function PostCard({ post }: { post: FeedPost }) {
   );
 }
 
+// Per-comment like toggle for both comments and replies. Mirrors the post
+// like button: optimistic flip + count, reconciled with the server's
+// authoritative count, reverting on failure. The action is idempotent, so a
+// rapid double-tap or retry can't double-count.
+function CommentLikeButton({ comment }: { comment: FeedComment }) {
+  const [liked, setLiked] = useState(comment.likedByMe);
+  const [likeCount, setLikeCount] = useState(comment.likeCount);
+  const [isLiking, startLike] = useTransition();
+
+  function handleToggleLike() {
+    const prevLiked = liked;
+    const prevCount = likeCount;
+    const nextLiked = !prevLiked;
+
+    setLiked(nextLiked);
+    setLikeCount(nextLiked ? prevCount + 1 : Math.max(0, prevCount - 1));
+
+    startLike(async () => {
+      try {
+        const res = await toggleCommentLike({
+          commentId: comment.id,
+          liked: nextLiked,
+        });
+        if (res.ok) {
+          setLiked(res.liked);
+          setLikeCount(res.likeCount);
+          return;
+        }
+      } catch {
+        // Restore the previous state below when the server action rejects.
+      }
+
+      setLiked(prevLiked);
+      setLikeCount(prevCount);
+    });
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleToggleLike}
+      disabled={isLiking}
+      aria-pressed={liked}
+      className="_feed_inner_comment_box_icon_btn"
+      style={{
+        alignItems: "center",
+        color: liked ? "#377dff" : undefined,
+        display: "inline-flex",
+        fontSize: 13,
+        fontWeight: 600,
+        gap: 5,
+        padding: 0,
+      }}
+    >
+      <ThumbsUpIcon />
+      {liked ? "Liked" : "Like"}
+      {likeCount > 0 ? ` · ${likeCount}` : ""}
+    </button>
+  );
+}
+
 function CommentRow({
   comment,
   onReplyCreated,
@@ -334,8 +401,16 @@ function CommentRow({
               </div>
             </div>
           </div>
-          <div style={{ display: "flex", gap: 12, margin: "0 0 12px" }}>
+          <div
+            style={{
+              alignItems: "center",
+              display: "flex",
+              gap: 12,
+              margin: "0 0 12px",
+            }}
+          >
             <p className="_feed_inner_timeline_post_box_para">{comment.time}</p>
+            <CommentLikeButton comment={comment} />
             <button
               type="button"
               onClick={() => setReplying((current) => !current)}
@@ -410,7 +485,16 @@ function ReplyRow({ reply }: { reply: FeedComment }) {
             </div>
           </div>
         </div>
-        <p className="_feed_inner_timeline_post_box_para">{reply.time}</p>
+        <div
+          style={{
+            alignItems: "center",
+            display: "flex",
+            gap: 12,
+          }}
+        >
+          <p className="_feed_inner_timeline_post_box_para">{reply.time}</p>
+          <CommentLikeButton comment={reply} />
+        </div>
       </div>
     </div>
   );

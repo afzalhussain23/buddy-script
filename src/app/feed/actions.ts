@@ -5,7 +5,13 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { uuidv7 } from "uuidv7";
 import { db } from "@/db";
-import { comments, imageUploads, postLikes, posts } from "@/db/social";
+import {
+  commentLikes,
+  comments,
+  imageUploads,
+  postLikes,
+  posts,
+} from "@/db/social";
 import { auth } from "@/lib/auth";
 import {
   deleteR2Object,
@@ -264,6 +270,82 @@ export async function toggleLike(input: {
   return { ok: true, liked, likeCount: Number(row.like_count) };
 }
 
+// Set the viewer's like state for a comment (or reply) to `liked`. Same shape
+// and guarantees as toggleLike: idempotent (desired end state, not a blind
+// toggle), and the comment_likes row change plus the comments.like_count
+// adjustment happen in one atomic statement so the counter stays exact under a
+// double-tap or retry. Only live comments on posts the viewer can see qualify.
+export async function toggleCommentLike(input: {
+  commentId: string;
+  liked: boolean;
+}): Promise<ToggleLikeResult> {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session) return { ok: false, error: "Authentication required." };
+
+  if (
+    !input ||
+    typeof input.commentId !== "string" ||
+    typeof input.liked !== "boolean"
+  ) {
+    return { ok: false, error: "Invalid like data." };
+  }
+
+  const userId = session.user.id;
+  const { commentId, liked } = input;
+
+  const result = liked
+    ? await db.execute<{ like_count: number }>(sql`
+        with target as (
+          select 1 from ${comments}
+          inner join ${posts} on ${posts.id} = ${comments.postId}
+          where ${comments.id} = ${commentId}
+            and ${comments.deletedAt} is null
+            and ${posts.deletedAt} is null
+            and (${posts.isPrivate} = false or ${posts.authorId} = ${userId})
+        ),
+        ins as (
+          insert into ${commentLikes} (user_id, comment_id)
+          select ${userId}, ${commentId} from target
+          on conflict (user_id, comment_id) do nothing
+          returning 1
+        )
+        update ${comments}
+        set like_count = like_count + (select count(*) from ins)
+        where ${comments.id} = ${commentId}
+          and exists (select 1 from target)
+        returning like_count
+      `)
+    : await db.execute<{ like_count: number }>(sql`
+        with target as (
+          select 1 from ${comments}
+          inner join ${posts} on ${posts.id} = ${comments.postId}
+          where ${comments.id} = ${commentId}
+            and ${comments.deletedAt} is null
+            and ${posts.deletedAt} is null
+            and (${posts.isPrivate} = false or ${posts.authorId} = ${userId})
+        ),
+        del as (
+          delete from ${commentLikes}
+          where ${commentLikes.userId} = ${userId}
+            and ${commentLikes.commentId} = ${commentId}
+            and exists (select 1 from target)
+          returning 1
+        )
+        update ${comments}
+        set like_count = greatest(0, like_count - (select count(*) from del))
+        where ${comments.id} = ${commentId}
+          and exists (select 1 from target)
+        returning like_count
+      `);
+
+  const row = result.rows[0];
+  if (!row) {
+    return { ok: false, error: "Comment not found." };
+  }
+
+  return { ok: true, liked, likeCount: Number(row.like_count) };
+}
+
 type CreateCommentResult =
   | { ok: true; comment: FeedComment; commentCount: number }
   | { ok: false; error: string };
@@ -350,6 +432,8 @@ export async function createComment(input: {
       authorName: session.user.name,
       authorImage: session.user.image ?? null,
       body: row.body,
+      likeCount: 0,
+      likedByMe: false,
       time: formatRelativeTime(new Date()),
       replies: [],
       nextReplyCursor: null,
@@ -440,6 +524,8 @@ export async function createReply(
       authorName: session.user.name,
       authorImage: session.user.image ?? null,
       body: row.body,
+      likeCount: 0,
+      likedByMe: false,
       time: formatRelativeTime(new Date(row.created_at)),
       replies: [],
       nextReplyCursor: null,

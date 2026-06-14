@@ -13,7 +13,7 @@ import {
 } from "drizzle-orm";
 import { db } from "@/db";
 import { user } from "@/db/auth";
-import { comments, postLikes, posts } from "@/db/social";
+import { commentLikes, comments, postLikes, posts } from "@/db/social";
 import { formatRelativeTime } from "@/lib/relative-time";
 
 export const FEED_PAGE_SIZE = 20;
@@ -35,6 +35,8 @@ export type FeedComment = {
   authorName: string;
   authorImage: string | null;
   body: string;
+  likeCount: number;
+  likedByMe: boolean;
   time: string;
   replies: FeedComment[];
   nextReplyCursor: CommentCursor | null;
@@ -75,6 +77,8 @@ function toFeedComment(row: {
   postId: string;
   parentId: string | null;
   body: string;
+  likeCount: number;
+  likedByMe: boolean;
   createdAt: Date;
   authorName: string | null;
   authorImage: string | null;
@@ -86,13 +90,15 @@ function toFeedComment(row: {
     authorName: row.authorName ?? "[deleted user]",
     authorImage: row.authorImage,
     body: row.body,
+    likeCount: row.likeCount,
+    likedByMe: row.likedByMe,
     time: formatRelativeTime(row.createdAt),
     replies: [],
     nextReplyCursor: null,
   };
 }
 
-async function getRepliesByParentIds(parentIds: string[]) {
+async function getRepliesByParentIds(viewerId: string, parentIds: string[]) {
   const rankedReplies = db
     .select({
       id: comments.id,
@@ -100,6 +106,7 @@ async function getRepliesByParentIds(parentIds: string[]) {
       parentId: comments.parentId,
       authorId: comments.authorId,
       body: comments.body,
+      likeCount: comments.likeCount,
       createdAt: comments.createdAt,
       createdAtCursor:
         sql<string>`to_char(${comments.createdAt}, 'YYYY-MM-DD"T"HH24:MI:SS.US')`.as(
@@ -122,6 +129,8 @@ async function getRepliesByParentIds(parentIds: string[]) {
           postId: rankedReplies.postId,
           parentId: rankedReplies.parentId,
           body: rankedReplies.body,
+          likeCount: rankedReplies.likeCount,
+          likedByMe: sql<boolean>`${commentLikes.userId} is not null`,
           createdAt: rankedReplies.createdAt,
           createdAtCursor: rankedReplies.createdAtCursor,
           authorName: user.name,
@@ -129,6 +138,13 @@ async function getRepliesByParentIds(parentIds: string[]) {
         })
         .from(rankedReplies)
         .leftJoin(user, eq(rankedReplies.authorId, user.id))
+        .leftJoin(
+          commentLikes,
+          and(
+            eq(commentLikes.commentId, rankedReplies.id),
+            eq(commentLikes.userId, viewerId),
+          ),
+        )
         .where(lte(rankedReplies.rank, REPLY_PAGE_SIZE + 1))
         .orderBy(
           asc(rankedReplies.parentId),
@@ -222,6 +238,7 @@ export async function getFeedPage(
       parentId: comments.parentId,
       authorId: comments.authorId,
       body: comments.body,
+      likeCount: comments.likeCount,
       createdAt: comments.createdAt,
       createdAtCursor:
         sql<string>`to_char(${comments.createdAt}, 'YYYY-MM-DD"T"HH24:MI:SS.US')`.as(
@@ -248,6 +265,8 @@ export async function getFeedPage(
           postId: rankedComments.postId,
           parentId: rankedComments.parentId,
           body: rankedComments.body,
+          likeCount: rankedComments.likeCount,
+          likedByMe: sql<boolean>`${commentLikes.userId} is not null`,
           createdAt: rankedComments.createdAt,
           createdAtCursor: rankedComments.createdAtCursor,
           authorName: user.name,
@@ -255,6 +274,13 @@ export async function getFeedPage(
         })
         .from(rankedComments)
         .leftJoin(user, eq(rankedComments.authorId, user.id))
+        .leftJoin(
+          commentLikes,
+          and(
+            eq(commentLikes.commentId, rankedComments.id),
+            eq(commentLikes.userId, viewerId),
+          ),
+        )
         .where(lte(rankedComments.rank, COMMENT_PAGE_SIZE + 1))
         .orderBy(
           asc(rankedComments.postId),
@@ -273,6 +299,7 @@ export async function getFeedPage(
     rows.slice(0, COMMENT_PAGE_SIZE),
   );
   const repliesByParent = await getRepliesByParentIds(
+    viewerId,
     visibleCommentRows.map((comment) => comment.id),
   );
 
@@ -349,6 +376,8 @@ export async function getCommentsPage(
       postId: comments.postId,
       parentId: comments.parentId,
       body: comments.body,
+      likeCount: comments.likeCount,
+      likedByMe: sql<boolean>`${commentLikes.userId} is not null`,
       createdAt: comments.createdAt,
       createdAtCursor: sql<string>`to_char(${comments.createdAt}, 'YYYY-MM-DD"T"HH24:MI:SS.US')`,
       authorName: user.name,
@@ -356,6 +385,13 @@ export async function getCommentsPage(
     })
     .from(comments)
     .leftJoin(user, eq(comments.authorId, user.id))
+    .leftJoin(
+      commentLikes,
+      and(
+        eq(commentLikes.commentId, comments.id),
+        eq(commentLikes.userId, viewerId),
+      ),
+    )
     .where(and(...conditions))
     .orderBy(asc(comments.createdAt), asc(comments.id))
     .limit(COMMENT_PAGE_SIZE + 1);
@@ -364,6 +400,7 @@ export async function getCommentsPage(
   const page = hasMore ? rows.slice(0, COMMENT_PAGE_SIZE) : rows;
   const last = page.at(-1);
   const repliesByParent = await getRepliesByParentIds(
+    viewerId,
     page.map((comment) => comment.id),
   );
 
@@ -412,6 +449,8 @@ export async function getRepliesPage(
       postId: comments.postId,
       parentId: comments.parentId,
       body: comments.body,
+      likeCount: comments.likeCount,
+      likedByMe: sql<boolean>`${commentLikes.userId} is not null`,
       createdAt: comments.createdAt,
       createdAtCursor: sql<string>`to_char(${comments.createdAt}, 'YYYY-MM-DD"T"HH24:MI:SS.US')`,
       authorName: user.name,
@@ -419,6 +458,13 @@ export async function getRepliesPage(
     })
     .from(comments)
     .leftJoin(user, eq(comments.authorId, user.id))
+    .leftJoin(
+      commentLikes,
+      and(
+        eq(commentLikes.commentId, comments.id),
+        eq(commentLikes.userId, viewerId),
+      ),
+    )
     .where(and(...conditions))
     .orderBy(asc(comments.createdAt), asc(comments.id))
     .limit(REPLY_PAGE_SIZE + 1);
