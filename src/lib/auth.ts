@@ -6,6 +6,7 @@ import { after } from "next/server";
 import { db } from "@/db";
 import * as schema from "@/db/auth";
 import { sendEmail } from "@/lib/email";
+import { authRedis } from "@/lib/redis";
 import {
   getFieldErrors,
   getValidationMessage,
@@ -20,6 +21,28 @@ export const auth = betterAuth({
     provider: "pg",
     schema,
   }),
+  // Back rate limiting (and other ephemeral state) with Upstash Redis so limits
+  // hold across serverless instances instead of Better Auth's default per-process
+  // in-memory store. authRedis disables auto-deserialization to honor the
+  // string-in/string-out secondaryStorage contract.
+  secondaryStorage: {
+    get: (key) => authRedis.get<string>(key),
+    set: async (key, value, ttl) => {
+      await (ttl
+        ? authRedis.set(key, value, { ex: ttl })
+        : authRedis.set(key, value));
+    },
+    delete: async (key) => {
+      await authRedis.del(key);
+    },
+  },
+  rateLimit: {
+    // Enable in every environment (not just production) so behavior matches the
+    // app's own Upstash limiter. Keeps Better Auth's hardened per-path defaults
+    // (sign-in/sign-up 3/10s, password reset 3/60s), keyed by IP.
+    enabled: true,
+    storage: "secondary-storage",
+  },
   user: {
     additionalFields: {
       firstName: { type: "string", required: true, input: true },

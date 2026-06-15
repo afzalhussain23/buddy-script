@@ -14,8 +14,6 @@ import { consumeRateLimit } from "@/lib/rate-limit";
 import { limitRequestBody, RequestBodyTooLargeError } from "@/lib/request-body";
 import { getFieldErrors, getValidationMessage } from "@/lib/validation";
 
-const UPLOAD_LIMIT = 10;
-const UPLOAD_LIMIT_WINDOW_MS = 10 * 60 * 1000;
 const MAX_METADATA_BODY_BYTES = 16 * 1024;
 
 function isAllowedOrigin(request: Request): boolean {
@@ -81,12 +79,7 @@ export async function POST(request: Request) {
   }
   const { contentType, size } = parsed.data;
 
-  const rateLimit = await consumeRateLimit({
-    action: "image-upload",
-    identifier: session.user.id,
-    limit: UPLOAD_LIMIT,
-    windowMs: UPLOAD_LIMIT_WINDOW_MS,
-  });
+  const rateLimit = await consumeRateLimit("image-upload", session.user.id);
   if (!rateLimit.allowed) {
     return NextResponse.json(
       { error: "Too many image uploads. Please try again shortly." },

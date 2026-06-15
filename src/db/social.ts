@@ -99,16 +99,6 @@ export const imageUploads = pgTable(
   ],
 );
 
-export const rateLimitBuckets = pgTable(
-  "rate_limit_buckets",
-  {
-    key: text("key").primaryKey(),
-    count: integer("count").default(1).notNull(),
-    expiresAt: timestamp("expires_at").notNull(),
-  },
-  (table) => [index("rate_limit_buckets_expires_idx").on(table.expiresAt)],
-);
-
 export const comments = pgTable(
   "comments",
   {

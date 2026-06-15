@@ -74,10 +74,6 @@ function unexpectedFailure(context: string, error: unknown): ActionFailure {
 }
 
 type CreatePostResult = { ok: true; post: FeedPost } | ActionFailure;
-const POST_LIMIT = 20;
-const POST_LIMIT_WINDOW_MS = 10 * 60 * 1000;
-const COMMENT_LIMIT = 30;
-const COMMENT_LIMIT_WINDOW_MS = 10 * 60 * 1000;
 
 // Shape a freshly-inserted row into a FeedPost so the client can render it
 // without a round-trip. The author is always the current session user.
@@ -113,12 +109,7 @@ export async function createPost(input: unknown): Promise<CreatePostResult> {
     return validationFailure(parsed.error, "Invalid post data.");
   }
   const { body, uploadId } = parsed.data;
-  const rateLimit = await consumeRateLimit({
-    action: "create-post",
-    identifier: session.user.id,
-    limit: POST_LIMIT,
-    windowMs: POST_LIMIT_WINDOW_MS,
-  });
+  const rateLimit = await consumeRateLimit("create-post", session.user.id);
   if (!rateLimit.allowed) {
     return { ok: false, error: "Too many posts. Please try again shortly." };
   }
@@ -252,6 +243,13 @@ export async function toggleLike(input: unknown): Promise<ToggleLikeResult> {
     return validationFailure(parsed.error, "Invalid like data.");
   }
   const userId = session.user.id;
+  const rateLimit = await consumeRateLimit("toggle-like", userId);
+  if (!rateLimit.allowed) {
+    return {
+      ok: false,
+      error: "You're doing that too fast. Please slow down.",
+    };
+  }
   const { postId, liked } = parsed.data;
 
   let result: Awaited<ReturnType<typeof db.execute<{ like_count: number }>>>;
@@ -325,6 +323,13 @@ export async function toggleCommentLike(
     return validationFailure(parsed.error, "Invalid like data.");
   }
   const userId = session.user.id;
+  const rateLimit = await consumeRateLimit("toggle-like", userId);
+  if (!rateLimit.allowed) {
+    return {
+      ok: false,
+      error: "You're doing that too fast. Please slow down.",
+    };
+  }
   const { commentId, liked } = parsed.data;
 
   let result: Awaited<ReturnType<typeof db.execute<{ like_count: number }>>>;
@@ -402,12 +407,7 @@ export async function createComment(
   const { postId, body } = parsed.data;
 
   const userId = session.user.id;
-  const rateLimit = await consumeRateLimit({
-    action: "create-comment",
-    identifier: userId,
-    limit: COMMENT_LIMIT,
-    windowMs: COMMENT_LIMIT_WINDOW_MS,
-  });
+  const rateLimit = await consumeRateLimit("create-comment", userId);
   if (!rateLimit.allowed) {
     return { ok: false, error: "Too many comments. Please try again shortly." };
   }
@@ -498,12 +498,7 @@ export async function createReply(
 
   const { postId, parentId, body } = parsed.data;
   const userId = session.user.id;
-  const rateLimit = await consumeRateLimit({
-    action: "create-comment",
-    identifier: userId,
-    limit: COMMENT_LIMIT,
-    windowMs: COMMENT_LIMIT_WINDOW_MS,
-  });
+  const rateLimit = await consumeRateLimit("create-comment", userId);
   if (!rateLimit.allowed) {
     return { ok: false, error: "Too many comments. Please try again shortly." };
   }
@@ -603,6 +598,14 @@ export async function loadMorePosts(
     return validationFailure(parsed.error, "Invalid feed cursor.");
   }
 
+  const rateLimit = await consumeRateLimit("feed-read", session.user.id);
+  if (!rateLimit.allowed) {
+    return {
+      ok: false,
+      error: "You're doing that too fast. Please slow down.",
+    };
+  }
+
   try {
     return { ok: true, page: await getFeedPage(session.user.id, parsed.data) };
   } catch (error) {
@@ -621,6 +624,14 @@ export async function loadMoreComments(
   const parsed = loadMoreCommentsSchema.safeParse(input);
   if (!parsed.success) {
     return validationFailure(parsed.error, "Invalid comment cursor.");
+  }
+
+  const rateLimit = await consumeRateLimit("feed-read", session.user.id);
+  if (!rateLimit.allowed) {
+    return {
+      ok: false,
+      error: "You're doing that too fast. Please slow down.",
+    };
   }
 
   try {
@@ -648,6 +659,14 @@ export async function loadMoreReplies(
   const parsed = loadMoreRepliesSchema.safeParse(input);
   if (!parsed.success) {
     return validationFailure(parsed.error, "Invalid reply cursor.");
+  }
+
+  const rateLimit = await consumeRateLimit("feed-read", session.user.id);
+  if (!rateLimit.allowed) {
+    return {
+      ok: false,
+      error: "You're doing that too fast. Please slow down.",
+    };
   }
 
   try {
@@ -678,6 +697,15 @@ export async function loadLikers(input: unknown): Promise<LoadLikersResult> {
   if (!parsed.success) {
     return validationFailure(parsed.error, "Invalid likes request.");
   }
+
+  const rateLimit = await consumeRateLimit("feed-read", session.user.id);
+  if (!rateLimit.allowed) {
+    return {
+      ok: false,
+      error: "You're doing that too fast. Please slow down.",
+    };
+  }
+
   const { targetType, targetId, cursor } = parsed.data;
 
   try {

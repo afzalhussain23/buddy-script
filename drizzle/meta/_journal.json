@@ -57,6 +57,13 @@
       "when": 1781525194395,
       "tag": "0007_lazy_iron_patriot",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1781537113748,
+      "tag": "0008_military_tana_nile",
+      "breakpoints": true
     }
   ]
 }
