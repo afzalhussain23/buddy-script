@@ -1,14 +1,19 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import type { HeadObjectCommandOutput } from "@aws-sdk/client-s3";
+import type {
+  GetObjectCommandOutput,
+  HeadObjectCommandOutput,
+} from "@aws-sdk/client-s3";
 import {
   CopyObjectCommand,
   DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
+  NoSuchKey,
   PutObjectCommand,
   S3Client,
+  S3ServiceException,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { getImageDimensions, type ImageDimensions } from "./image-dimensions";
@@ -37,7 +42,6 @@ type R2Config = {
   accessKeyId: string;
   secretAccessKey: string;
   bucket: string;
-  publicBaseUrl: string;
 };
 
 export class R2ConfigurationError extends Error {
@@ -54,13 +58,19 @@ export class R2UploadVerificationError extends Error {
   }
 }
 
+export class R2ObjectNotFoundError extends Error {
+  constructor() {
+    super("The requested image object was not found.");
+    this.name = "R2ObjectNotFoundError";
+  }
+}
+
 function getR2Config(): R2Config {
   const config = {
     accountId: process.env.R2_ACCOUNT_ID?.trim(),
     accessKeyId: process.env.R2_ACCESS_KEY_ID?.trim(),
     secretAccessKey: process.env.R2_SECRET_ACCESS_KEY?.trim(),
     bucket: process.env.R2_BUCKET?.trim(),
-    publicBaseUrl: process.env.R2_PUBLIC_BASE_URL?.trim().replace(/\/$/, ""),
   };
 
   if (Object.values(config).some((value) => !value)) {
@@ -68,11 +78,6 @@ function getR2Config(): R2Config {
   }
 
   return config as R2Config;
-}
-
-export function getPublicObjectUrl(baseUrl: string, key: string): string {
-  const encodedKey = key.split("/").map(encodeURIComponent).join("/");
-  return `${baseUrl}/${encodedKey}`;
 }
 
 export async function createPresignedImageUpload({
@@ -103,7 +108,6 @@ export async function createPresignedImageUpload({
     }),
     pendingObjectKey,
     publishedObjectKey,
-    publicUrl: getPublicObjectUrl(config.publicBaseUrl, publishedObjectKey),
     headers: { "Content-Type": contentType },
   };
 }
@@ -139,6 +143,12 @@ export async function verifyAndPublishImageUpload(upload: {
   } catch {
     throw new R2UploadVerificationError("The image upload was not found.");
   }
+
+  // The presigned PUT URL stays valid for minutes, so the object could be
+  // re-uploaded between this verification and the copy below. Pin the copy to
+  // the exact version we measure here; a swapped object fails the copy rather
+  // than publishing bytes that were never verified.
+  const sourceETag = object.ETag;
 
   if (
     object.ContentLength !== upload.expectedSize ||
@@ -186,15 +196,23 @@ export async function verifyAndPublishImageUpload(upload: {
     );
   }
 
-  await client.send(
-    new CopyObjectCommand({
-      Bucket: config.bucket,
-      CopySource: `${config.bucket}/${upload.pendingObjectKey}`,
-      Key: upload.publishedObjectKey,
-      ContentType: upload.contentType,
-      MetadataDirective: "REPLACE",
-    }),
-  );
+  try {
+    await client.send(
+      new CopyObjectCommand({
+        Bucket: config.bucket,
+        CopySource: `${config.bucket}/${upload.pendingObjectKey}`,
+        CopySourceIfMatch: sourceETag,
+        Key: upload.publishedObjectKey,
+        ContentType: upload.contentType,
+        MetadataDirective: "REPLACE",
+      }),
+    );
+  } catch {
+    await deleteR2Object(upload.pendingObjectKey).catch(() => undefined);
+    throw new R2UploadVerificationError(
+      "The uploaded image could not be verified.",
+    );
+  }
 
   return dimensions;
 }
@@ -246,4 +264,33 @@ export async function deleteR2Object(key: string): Promise<void> {
   await getR2Client(config).send(
     new DeleteObjectCommand({ Bucket: config.bucket, Key: key }),
   );
+}
+
+export async function getR2Object(key: string) {
+  const config = getR2Config();
+  let object: GetObjectCommandOutput;
+
+  try {
+    object = await getR2Client(config).send(
+      new GetObjectCommand({ Bucket: config.bucket, Key: key }),
+    );
+  } catch (error) {
+    if (
+      error instanceof NoSuchKey ||
+      (error instanceof S3ServiceException && error.name === "NoSuchKey")
+    ) {
+      throw new R2ObjectNotFoundError();
+    }
+    throw error;
+  }
+
+  if (!object.Body) {
+    throw new Error("R2 object response did not include a body.");
+  }
+
+  return {
+    body: object.Body.transformToWebStream(),
+    contentLength: object.ContentLength,
+    contentType: object.ContentType ?? "application/octet-stream",
+  };
 }

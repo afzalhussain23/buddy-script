@@ -26,7 +26,7 @@ export const posts = pgTable(
       onDelete: "set null",
     }),
     body: text("body").notNull(),
-    imageUrl: text("image_url"),
+    imageObjectKey: text("image_object_key"),
     imageWidth: integer("image_width"),
     imageHeight: integer("image_height"),
     isPrivate: boolean("is_private").default(false).notNull(),
@@ -53,10 +53,10 @@ export const posts = pgTable(
     index("posts_author_id_idx")
       .on(table.authorId)
       .where(sql`${table.authorId} is not null`),
-    // A published object belongs to one post. NULL remains valid for text-only posts.
-    uniqueIndex("posts_image_url_unique_idx")
-      .on(table.imageUrl)
-      .where(sql`${table.imageUrl} is not null`),
+    // A private R2 object belongs to one post. NULL remains valid for text-only posts.
+    uniqueIndex("posts_image_object_key_unique_idx")
+      .on(table.imageObjectKey)
+      .where(sql`${table.imageObjectKey} is not null`),
     check(
       "posts_image_dimensions_check",
       sql`(${table.imageWidth} is null and ${table.imageHeight} is null) or (${table.imageWidth} between 1 and ${sql.raw(String(MAX_IMAGE_DIMENSION))} and ${table.imageHeight} between 1 and ${sql.raw(String(MAX_IMAGE_DIMENSION))} and ${table.imageWidth} * ${table.imageHeight} <= ${sql.raw(String(MAX_IMAGE_PIXELS))})`,
@@ -75,7 +75,6 @@ export const imageUploads = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
     pendingObjectKey: text("pending_object_key").notNull().unique(),
     publishedObjectKey: text("published_object_key").notNull().unique(),
-    publicUrl: text("public_url").notNull().unique(),
     contentType: text("content_type").notNull(),
     expectedSize: integer("expected_size").notNull(),
     status: text("status").default("pending").notNull(),

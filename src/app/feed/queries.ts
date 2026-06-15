@@ -225,7 +225,7 @@ export async function getFeedPage(
     .select({
       id: posts.id,
       body: posts.body,
-      imageUrl: posts.imageUrl,
+      imageObjectKey: posts.imageObjectKey,
       imageWidth: posts.imageWidth,
       imageHeight: posts.imageHeight,
       isPrivate: posts.isPrivate,
@@ -331,7 +331,7 @@ export async function getFeedPage(
       authorName: r.authorName ?? "[deleted user]",
       authorImage: r.authorImage,
       body: r.body,
-      imageUrl: r.imageUrl,
+      imageUrl: r.imageObjectKey ? `/api/posts/${r.id}/image` : null,
       imageWidth: r.imageWidth,
       imageHeight: r.imageHeight,
       isPrivate: r.isPrivate,

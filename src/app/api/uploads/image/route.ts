@@ -109,7 +109,6 @@ export async function POST(request: Request) {
       userId: session.user.id,
       pendingObjectKey: upload.pendingObjectKey,
       publishedObjectKey: upload.publishedObjectKey,
-      publicUrl: upload.publicUrl,
       contentType,
       expectedSize: size,
       expiresAt: new Date(Date.now() + PENDING_UPLOAD_TTL_MS),

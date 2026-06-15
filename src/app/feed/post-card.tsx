@@ -206,6 +206,7 @@ export const PostCard = memo(function PostCard({
                 className="_time_img"
                 width={post.imageWidth}
                 height={post.imageHeight}
+                unoptimized
                 sizes="(max-width: 991px) calc(100vw - 48px), 50vw"
                 style={{ height: "auto" }}
               />
