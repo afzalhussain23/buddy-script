@@ -302,13 +302,19 @@ export function FeedNav({ name }: { name: string }) {
                   className="_nav_profile_img"
                 />
               </div>
-              <div className="_header_nav_dropdown">
+              <button
+                className="_header_nav_dropdown"
+                type="button"
+                aria-expanded={profileOpen}
+                onClick={() => setProfileOpen((v) => !v)}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                }}
+              >
                 <p className="_header_nav_para">{name}</p>
-                <button
-                  className="_header_nav_dropdown_btn _dropdown_toggle"
-                  type="button"
-                  onClick={() => setProfileOpen((v) => !v)}
-                >
+                <span className="_header_nav_dropdown_btn _dropdown_toggle">
                   <svg
                     aria-hidden="true"
                     xmlns="http://www.w3.org/2000/svg"
@@ -322,8 +328,8 @@ export function FeedNav({ name }: { name: string }) {
                       d="M5 5l.354.354L5 5.707l-.354-.353L5 5zm4.354-3.646l-4 4-.708-.708 4-4 .708.708zm-4.708 4l-4-4 .708-.708 4 4-.708.708z"
                     />
                   </svg>
-                </button>
-              </div>
+                </span>
+              </button>
               <div
                 className={`_nav_profile_dropdown _profile_dropdown${profileOpen ? " show" : ""}`}
               >

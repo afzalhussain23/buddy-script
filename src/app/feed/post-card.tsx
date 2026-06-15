@@ -186,7 +186,15 @@ export function PostCard({
             padding: 0,
           }}
         >
-          <p className="_feed_inner_timeline_total_reacts_para">{likeCount}</p>
+          {/* The theme overlaps this badge onto a row of reaction avatars with a
+              -16px left margin; we render only the count, so reset it to keep the
+              badge aligned with the card's left padding. */}
+          <p
+            className="_feed_inner_timeline_total_reacts_para"
+            style={{ marginLeft: 0 }}
+          >
+            {likeCount}
+          </p>
         </button>
         {likersOpen ? (
           <LikersModal

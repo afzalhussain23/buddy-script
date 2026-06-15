@@ -4,6 +4,14 @@ import { useRef, useState, useTransition } from "react";
 import { avatarUrl } from "@/lib/avatar";
 import { MAX_IMAGE_UPLOAD_BYTES, uploadImageToR2 } from "@/lib/image-upload";
 import { createPost } from "./actions";
+import {
+  ArticleIcon,
+  EventIcon,
+  PencilIcon,
+  PhotoIcon,
+  SendIcon,
+  VideoIcon,
+} from "./feed-icons";
 import type { FeedPost } from "./queries";
 
 export function CreatePost({
@@ -63,12 +71,19 @@ export function CreatePost({
         </div>
         <div className="form-floating _feed_inner_text_area_box_form">
           <textarea
+            id="floatingTextarea"
             className="form-control _textarea"
-            placeholder="Write something ..."
+            placeholder="Leave a comment here"
             value={body}
             maxLength={5000}
             onChange={(event) => setBody(event.target.value)}
           />
+          {body ? null : (
+            <label className="_feed_textarea_label" htmlFor="floatingTextarea">
+              Write something ...
+              <PencilIcon />
+            </label>
+          )}
         </div>
       </div>
 
@@ -107,25 +122,42 @@ export function CreatePost({
               disabled={isPending}
             >
               <span className="_feed_inner_text_area_bottom_photo_iamge _mar_img">
-                <svg
-                  aria-hidden="true"
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="20"
-                  height="20"
-                  fill="none"
-                  viewBox="0 0 20 20"
-                >
-                  <rect
-                    x="1"
-                    y="1"
-                    width="18"
-                    height="18"
-                    rx="4"
-                    stroke="#666"
-                  />
-                </svg>
+                <PhotoIcon />
               </span>
               Photo
+            </button>
+          </div>
+          <div className="_feed_inner_text_area_bottom_video _feed_common">
+            <button
+              type="button"
+              className="_feed_inner_text_area_bottom_photo_link"
+            >
+              <span className="_feed_inner_text_area_bottom_photo_iamge _mar_img">
+                <VideoIcon />
+              </span>
+              Video
+            </button>
+          </div>
+          <div className="_feed_inner_text_area_bottom_event _feed_common">
+            <button
+              type="button"
+              className="_feed_inner_text_area_bottom_photo_link"
+            >
+              <span className="_feed_inner_text_area_bottom_photo_iamge _mar_img">
+                <EventIcon />
+              </span>
+              Event
+            </button>
+          </div>
+          <div className="_feed_inner_text_area_bottom_article _feed_common">
+            <button
+              type="button"
+              className="_feed_inner_text_area_bottom_photo_link"
+            >
+              <span className="_feed_inner_text_area_bottom_photo_iamge _mar_img">
+                <ArticleIcon />
+              </span>
+              Article
             </button>
           </div>
         </div>
@@ -136,6 +168,7 @@ export function CreatePost({
             onClick={handleSubmit}
             disabled={isPending || (!body.trim() && !image)}
           >
+            <SendIcon />
             <span>{isPending ? "Posting..." : "Post"}</span>
           </button>
         </div>

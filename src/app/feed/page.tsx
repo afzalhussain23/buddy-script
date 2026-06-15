@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { DarkModeToggle } from "./dark-mode-toggle";
 import { friends, stories, suggestedPeople, youMightLike } from "./feed-data";
+import { exploreItems } from "./feed-icons";
 import { FeedNav } from "./feed-nav";
 import { FeedTimeline } from "./feed-timeline";
 import { getFeedPage } from "./queries";
@@ -35,36 +36,23 @@ export default async function FeedPage() {
                         Explore
                       </h4>
                       <ul className="_left_inner_area_explore_list">
-                        {[
-                          "Learning",
-                          "Insights",
-                          "Find friends",
-                          "Bookmarks",
-                          "Group",
-                          "Gaming",
-                          "Settings",
-                          "Save post",
-                        ].map((label) => (
+                        {exploreItems.map((item) => (
                           <li
-                            key={label}
-                            className="_left_inner_area_explore_item"
+                            key={item.label}
+                            className={`_left_inner_area_explore_item${item.isNew ? " _explore_item" : ""}`}
                           >
                             <a
                               href="#0"
                               className="_left_inner_area_explore_link"
                             >
-                              <svg
-                                aria-hidden="true"
-                                xmlns="http://www.w3.org/2000/svg"
-                                width="20"
-                                height="20"
-                                fill="none"
-                                viewBox="0 0 20 20"
-                              >
-                                <circle cx="10" cy="10" r="9" stroke="#666" />
-                              </svg>
-                              {label}
+                              {item.icon}
+                              {item.label}
                             </a>
+                            {item.isNew ? (
+                              <span className="_left_inner_area_explore_link_txt">
+                                New
+                              </span>
+                            ) : null}
                           </li>
                         ))}
                       </ul>
@@ -183,7 +171,14 @@ export default async function FeedPage() {
                   <div className="_layout_middle_inner">
                     {/* Stories */}
                     <div className="_feed_inner_ppl_card _mar_b16">
-                      <div className="row">
+                      {/* Zero the row's negative gutter margins: there's no padded
+                          parent here to absorb them, so they spilled ~12px past the
+                          middle column and caused a slight horizontal scroll. Column
+                          padding still provides the inter-card gaps. */}
+                      <div
+                        className="row"
+                        style={{ marginLeft: 0, marginRight: 0 }}
+                      >
                         <div className="col-xl-3 col-lg-3 col-md-4 col-sm-4 col">
                           <div className="_feed_inner_profile_story _b_radious6">
                             <div className="_feed_inner_profile_story_image">
