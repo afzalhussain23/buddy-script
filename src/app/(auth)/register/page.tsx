@@ -1,6 +1,12 @@
+import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { AuthShapes } from "../auth-shapes";
 import { RegisterForm } from "./register-form";
+
+export const metadata: Metadata = {
+  title: "Register",
+};
 
 export default function RegisterPage() {
   return (
@@ -13,15 +19,21 @@ export default function RegisterPage() {
               <div className="col-xl-8 col-lg-8 col-md-12 col-sm-12">
                 <div className="_social_registration_right">
                   <div className="_social_registration_right_image">
-                    <img
+                    <Image
                       src="/assets/images/registration.png"
                       alt="Registration illustration"
+                      width={1928}
+                      height={1422}
+                      sizes="(max-width: 991px) 100vw, 66vw"
                     />
                   </div>
                   <div className="_social_registration_right_image_dark">
-                    <img
+                    <Image
                       src="/assets/images/registration1.png"
                       alt="Registration illustration"
+                      width={1928}
+                      height={1422}
+                      sizes="(max-width: 991px) 100vw, 66vw"
                     />
                   </div>
                 </div>
@@ -29,10 +41,12 @@ export default function RegisterPage() {
               <div className="col-xl-4 col-lg-4 col-md-12 col-sm-12">
                 <div className="_social_registration_content">
                   <div className="_social_registration_right_logo _mar_b28">
-                    <img
+                    <Image
                       src="/assets/images/logo.svg"
                       alt="Buddy Script"
                       className="_right_logo"
+                      width={158}
+                      height={33}
                     />
                   </div>
                   <p className="_social_registration_content_para _mar_b8">
@@ -45,10 +59,12 @@ export default function RegisterPage() {
                     type="button"
                     className="_social_registration_content_btn _mar_b40"
                   >
-                    <img
+                    <Image
                       src="/assets/images/google.svg"
                       alt="Google"
                       className="_google_img"
+                      width={20}
+                      height={20}
                     />{" "}
                     <span>Register with google</span>
                   </button>

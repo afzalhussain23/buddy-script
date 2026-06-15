@@ -1,4 +1,9 @@
+import type { Metadata } from "next";
 import Script from "next/script";
+
+export const metadata: Metadata = {
+  title: "Feed",
+};
 
 // The /feed screen reuses the original Buddy Script theme (Bootstrap + the
 // bundled common/main/responsive stylesheets). They're scoped to this route by
