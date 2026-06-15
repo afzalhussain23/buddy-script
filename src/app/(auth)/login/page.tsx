@@ -5,7 +5,6 @@ import { LoginForm } from "./login-form";
 export default function LoginPage() {
   return (
     <>
-      {/*Login Section Start*/}
       <section className="_social_login_wrapper _layout_main_wrapper">
         <AuthShapes />
         <div className="_social_login_wrap">
@@ -69,7 +68,6 @@ export default function LoginPage() {
           </div>
         </div>
       </section>
-      {/*Login Section End*/}
     </>
   );
 }

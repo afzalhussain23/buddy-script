@@ -74,7 +74,6 @@ export function FeedNav({ name }: { name: string }) {
 
   return (
     <>
-      {/* Desktop Menu */}
       <nav className="navbar navbar-expand-lg navbar-light _header_nav _padd_t10">
         <div className="container _custom_container">
           <div className="_logo_wrap">
@@ -387,7 +386,6 @@ export function FeedNav({ name }: { name: string }) {
         </div>
       </nav>
 
-      {/* Mobile top menu */}
       <div className="_header_mobile_menu">
         <div className="_header_mobile_menu_wrap">
           <div className="container">
@@ -439,7 +437,6 @@ export function FeedNav({ name }: { name: string }) {
         </div>
       </div>
 
-      {/* Mobile bottom navigation */}
       <div className="_mobile_navigation_bottom_wrapper">
         <div className="_mobile_navigation_bottom_wrap">
           <div className="conatiner">

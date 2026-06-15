@@ -5,7 +5,6 @@ import { RegisterForm } from "./register-form";
 export default function RegisterPage() {
   return (
     <>
-      {/*Registration Section Start*/}
       <section className="_social_registration_wrapper _layout_main_wrapper">
         <AuthShapes />
         <div className="_social_registration_wrap">
@@ -74,7 +73,6 @@ export default function RegisterPage() {
           </div>
         </div>
       </section>
-      {/*Registration Section End*/}
     </>
   );
 }
