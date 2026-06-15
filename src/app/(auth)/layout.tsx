@@ -1,9 +1,4 @@
-import type { Metadata } from "next";
 import Script from "next/script";
-
-export const metadata: Metadata = {
-  title: "Buddy Script",
-};
 
 export default function AuthLayout({
   children,
