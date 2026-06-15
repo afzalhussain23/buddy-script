@@ -3,7 +3,21 @@
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
 import { authClient } from "@/lib/auth-client";
-import { registerFormSchema } from "@/lib/validation";
+import {
+  type FieldErrors,
+  getFieldErrors,
+  getResponseFieldErrors,
+  registerFormSchema,
+} from "@/lib/validation";
+
+function FieldError({ id, errors }: { id: string; errors?: string[] }) {
+  if (!errors?.length) return null;
+  return (
+    <p id={id} role="alert" style={{ color: "#ff4d4f", margin: "6px 0 0" }}>
+      {errors[0]}
+    </p>
+  );
+}
 
 // Interactive island for the register screen. Kept separate from the page so the
 // surrounding static markup (illustration, logo, headings) stays a server
@@ -17,16 +31,13 @@ export function RegisterForm() {
   const [repeatPassword, setRepeatPassword] = useState("");
   const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [loading, setLoading] = useState(false);
 
   async function handleRegister(e: FormEvent) {
     e.preventDefault();
     setError("");
-
-    if (!agreed) {
-      setError("Please agree to the terms & conditions.");
-      return;
-    }
+    setFieldErrors({});
 
     const parsed = registerFormSchema.safeParse({
       firstName,
@@ -34,9 +45,10 @@ export function RegisterForm() {
       email,
       password,
       repeatPassword,
+      acceptedTerms: agreed,
     });
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? "Invalid details.");
+      setFieldErrors(getFieldErrors(parsed.error));
       return;
     }
 
@@ -50,10 +62,15 @@ export function RegisterForm() {
         password: parsed.data.password,
         firstName: parsed.data.firstName,
         lastName: parsed.data.lastName,
+        acceptedTerms: parsed.data.acceptedTerms,
         name: "",
       });
       if (error) {
-        setError(error.message ?? "Unable to register. Please try again.");
+        const nextFieldErrors = getResponseFieldErrors(error);
+        setFieldErrors(nextFieldErrors);
+        if (!Object.keys(nextFieldErrors).length) {
+          setError(error.message ?? "Unable to register. Please try again.");
+        }
         return;
       }
       router.push("/feed");
@@ -81,9 +98,14 @@ export function RegisterForm() {
               type="text"
               autoComplete="given-name"
               className="form-control _social_registration_input"
+              aria-invalid={Boolean(fieldErrors.firstName)}
+              aria-describedby={
+                fieldErrors.firstName ? "firstNameError" : undefined
+              }
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
             />
+            <FieldError id="firstNameError" errors={fieldErrors.firstName} />
           </div>
         </div>
         <div className="col-xl-6 col-lg-12 col-md-6 col-sm-12">
@@ -100,9 +122,14 @@ export function RegisterForm() {
               type="text"
               autoComplete="family-name"
               className="form-control _social_registration_input"
+              aria-invalid={Boolean(fieldErrors.lastName)}
+              aria-describedby={
+                fieldErrors.lastName ? "lastNameError" : undefined
+              }
               value={lastName}
               onChange={(e) => setLastName(e.target.value)}
             />
+            <FieldError id="lastNameError" errors={fieldErrors.lastName} />
           </div>
         </div>
         <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12">
@@ -121,9 +148,14 @@ export function RegisterForm() {
               autoCapitalize="none"
               spellCheck={false}
               className="form-control _social_registration_input"
+              aria-invalid={Boolean(fieldErrors.email)}
+              aria-describedby={
+                fieldErrors.email ? "registerEmailError" : undefined
+              }
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
+            <FieldError id="registerEmailError" errors={fieldErrors.email} />
           </div>
         </div>
         <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12">
@@ -140,8 +172,16 @@ export function RegisterForm() {
               type="password"
               autoComplete="new-password"
               className="form-control _social_registration_input"
+              aria-invalid={Boolean(fieldErrors.password)}
+              aria-describedby={
+                fieldErrors.password ? "registerPasswordError" : undefined
+              }
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+            />
+            <FieldError
+              id="registerPasswordError"
+              errors={fieldErrors.password}
             />
           </div>
         </div>
@@ -159,8 +199,16 @@ export function RegisterForm() {
               type="password"
               autoComplete="new-password"
               className="form-control _social_registration_input"
+              aria-invalid={Boolean(fieldErrors.repeatPassword)}
+              aria-describedby={
+                fieldErrors.repeatPassword ? "repeatPasswordError" : undefined
+              }
               value={repeatPassword}
               onChange={(e) => setRepeatPassword(e.target.value)}
+            />
+            <FieldError
+              id="repeatPasswordError"
+              errors={fieldErrors.repeatPassword}
             />
           </div>
         </div>
@@ -174,6 +222,10 @@ export function RegisterForm() {
               name="agreeTerms"
               id="agreeTerms"
               checked={agreed}
+              aria-invalid={Boolean(fieldErrors.acceptedTerms)}
+              aria-describedby={
+                fieldErrors.acceptedTerms ? "acceptedTermsError" : undefined
+              }
               onChange={(e) => setAgreed(e.target.checked)}
             />
             <label
@@ -182,6 +234,10 @@ export function RegisterForm() {
             >
               I agree to terms & conditions
             </label>
+            <FieldError
+              id="acceptedTermsError"
+              errors={fieldErrors.acceptedTerms}
+            />
           </div>
         </div>
       </div>

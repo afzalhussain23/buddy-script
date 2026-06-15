@@ -110,7 +110,7 @@ function ComposerFrame({
           setBody("");
           onCreated(result.comment, result.commentCount);
         } else {
-          setError(result.error);
+          setError(result.fieldErrors?.body?.[0] ?? result.error);
         }
       } catch {
         setError(failureError);
@@ -141,6 +141,8 @@ function ComposerFrame({
               className="form-control _comment_textarea"
               placeholder={placeholder}
               aria-label={placeholder}
+              aria-invalid={Boolean(error)}
+              aria-describedby={error ? `${submitLabel}BodyError` : undefined}
               maxLength={2000}
               value={body}
               onChange={(event) => setBody(event.target.value)}
@@ -176,6 +178,7 @@ function ComposerFrame({
       </form>
       {error ? (
         <p
+          id={`${submitLabel}BodyError`}
           className="_feed_inner_timeline_post_box_para"
           style={{ color: "#d92d20", margin: "6px 0 0 34px" }}
         >

@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { Avatar } from "@/components/avatar";
 import { MAX_IMAGE_UPLOAD_BYTES, uploadImageToR2 } from "@/lib/image-upload";
+import type { FieldErrors } from "@/lib/validation";
 import { createPost } from "./actions";
 import {
   ArticleIcon,
@@ -25,10 +26,12 @@ export function CreatePost({
   const [body, setBody] = useState("");
   const [image, setImage] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [isPending, startTransition] = useTransition();
 
   function chooseImage(file: File | undefined) {
     setError(null);
+    setFieldErrors({});
     if (!file) return;
     if (file.size > MAX_IMAGE_UPLOAD_BYTES) {
       setImage(null);
@@ -40,12 +43,16 @@ export function CreatePost({
 
   function handleSubmit() {
     setError(null);
+    setFieldErrors({});
     startTransition(async () => {
       try {
         const uploadId = image ? await uploadImageToR2(image) : null;
         const result = await createPost({ body, uploadId });
         if (!result.ok) {
-          setError(result.error);
+          setFieldErrors(result.fieldErrors ?? {});
+          if (!result.fieldErrors || !Object.keys(result.fieldErrors).length) {
+            setError(result.error);
+          }
           return;
         }
         onCreated(result.post);
@@ -75,6 +82,8 @@ export function CreatePost({
             placeholder="Leave a comment here"
             value={body}
             maxLength={5000}
+            aria-invalid={Boolean(fieldErrors.body)}
+            aria-describedby={fieldErrors.body ? "postBodyError" : undefined}
             onChange={(event) => setBody(event.target.value)}
           />
           {body ? null : (
@@ -86,6 +95,16 @@ export function CreatePost({
         </div>
       </div>
 
+      {fieldErrors.body?.[0] ? (
+        <p
+          id="postBodyError"
+          role="alert"
+          style={{ margin: "12px 0 0", color: "#c62828" }}
+        >
+          {fieldErrors.body[0]}
+        </p>
+      ) : null}
+
       {image ? (
         <p style={{ margin: "12px 0 0", color: "#666" }}>
           {image.name} ({(image.size / 1024 / 1024).toFixed(1)} MB)
@@ -96,6 +115,11 @@ export function CreatePost({
           >
             Remove
           </button>
+        </p>
+      ) : null}
+      {fieldErrors.uploadId?.[0] ? (
+        <p role="alert" style={{ margin: "12px 0 0", color: "#c62828" }}>
+          {fieldErrors.uploadId[0]}
         </p>
       ) : null}
       {error ? (

@@ -3,7 +3,21 @@
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
 import { authClient } from "@/lib/auth-client";
-import { signInSchema } from "@/lib/validation";
+import {
+  type FieldErrors,
+  getFieldErrors,
+  getResponseFieldErrors,
+  signInSchema,
+} from "@/lib/validation";
+
+function FieldError({ id, errors }: { id: string; errors?: string[] }) {
+  if (!errors?.length) return null;
+  return (
+    <p id={id} role="alert" style={{ color: "#ff4d4f", margin: "6px 0 0" }}>
+      {errors[0]}
+    </p>
+  );
+}
 
 // Interactive island for the login screen. Kept separate from the page so the
 // surrounding static markup (illustration, logo, headings) stays a server
@@ -13,15 +27,17 @@ export function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [loading, setLoading] = useState(false);
 
   async function handleLogin(e: FormEvent) {
     e.preventDefault();
     setError("");
+    setFieldErrors({});
 
     const parsed = signInSchema.safeParse({ email, password });
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? "Invalid details.");
+      setFieldErrors(getFieldErrors(parsed.error));
       return;
     }
 
@@ -29,7 +45,11 @@ export function LoginForm() {
     try {
       const { error } = await authClient.signIn.email({ email, password });
       if (error) {
-        setError(error.message ?? "Invalid email or password.");
+        const nextFieldErrors = getResponseFieldErrors(error);
+        setFieldErrors(nextFieldErrors);
+        if (!Object.keys(nextFieldErrors).length) {
+          setError(error.message ?? "Invalid email or password.");
+        }
         return;
       }
       router.push("/feed");
@@ -56,9 +76,14 @@ export function LoginForm() {
               autoCapitalize="none"
               spellCheck={false}
               className="form-control _social_login_input"
+              aria-invalid={Boolean(fieldErrors.email)}
+              aria-describedby={
+                fieldErrors.email ? "loginEmailError" : undefined
+              }
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
+            <FieldError id="loginEmailError" errors={fieldErrors.email} />
           </div>
         </div>
         <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12">
@@ -75,9 +100,14 @@ export function LoginForm() {
               type="password"
               autoComplete="current-password"
               className="form-control _social_login_input"
+              aria-invalid={Boolean(fieldErrors.password)}
+              aria-describedby={
+                fieldErrors.password ? "loginPasswordError" : undefined
+              }
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
+            <FieldError id="loginPasswordError" errors={fieldErrors.password} />
           </div>
         </div>
       </div>

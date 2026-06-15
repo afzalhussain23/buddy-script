@@ -20,6 +20,10 @@ if (r2PublicBaseUrl) {
 
 const nextConfig: NextConfig = {
   images: { remotePatterns },
+  experimental: {
+    serverActions: { bodySizeLimit: "64kb" },
+    proxyClientMaxBodySize: "64kb",
+  },
 };
 
 export default nextConfig;

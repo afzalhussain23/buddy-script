@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 export const MAX_IMAGE_UPLOAD_BYTES = 5 * 1024 * 1024;
 
 // Bounds for stored post-image dimensions. Single source of truth shared by the
@@ -15,10 +17,27 @@ export const ALLOWED_IMAGE_TYPES = [
 
 export type AllowedImageType = (typeof ALLOWED_IMAGE_TYPES)[number];
 
+export const imageUploadRequestSchema = z.strictObject({
+  contentType: z.enum(ALLOWED_IMAGE_TYPES, {
+    message: "Only JPEG, PNG, WebP, and GIF images are allowed.",
+  }),
+  size: z
+    .number({ message: "Image size must be a number." })
+    .int("Image size must be a whole number of bytes.")
+    .min(1, "Image must not be empty.")
+    .max(MAX_IMAGE_UPLOAD_BYTES, "Image must be 5 MB or smaller."),
+});
+
 type PresignedUpload = {
   uploadId: string;
   uploadUrl: string;
   headers: { "Content-Type": AllowedImageType };
+};
+
+type UploadError = {
+  error?: string;
+  message?: string;
+  fieldErrors?: Record<string, string[]>;
 };
 
 function isAllowedImageType(value: string): value is AllowedImageType {
@@ -40,10 +59,16 @@ export async function uploadImageToR2(file: File): Promise<string> {
   });
   const signingBody = (await signingResponse.json()) as
     | PresignedUpload
-    | { error?: string };
+    | UploadError;
 
   if (!signingResponse.ok || !("uploadUrl" in signingBody)) {
-    const message = "error" in signingBody ? signingBody.error : undefined;
+    const message =
+      "error" in signingBody
+        ? (signingBody.fieldErrors?.contentType?.[0] ??
+          signingBody.fieldErrors?.size?.[0] ??
+          signingBody.message ??
+          signingBody.error)
+        : undefined;
     throw new Error(message ?? "Could not prepare image upload.");
   }
 

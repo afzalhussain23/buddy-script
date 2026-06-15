@@ -20,6 +20,7 @@ export function FeedTimeline({
 }) {
   const [posts, setPosts] = useState(initialPosts);
   const [cursor, setCursor] = useState(initialCursor);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   function handleCreated(post: FeedPost) {
@@ -28,10 +29,19 @@ export function FeedTimeline({
 
   function handleLoadMore() {
     if (!cursor) return;
+    setLoadError(null);
     startTransition(async () => {
-      const next = await loadMorePosts(cursor);
-      setPosts((prev) => [...prev, ...next.posts]);
-      setCursor(next.nextCursor);
+      try {
+        const result = await loadMorePosts(cursor);
+        if (!result.ok) {
+          setLoadError(result.error);
+          return;
+        }
+        setPosts((prev) => [...prev, ...result.page.posts]);
+        setCursor(result.page.nextCursor);
+      } catch {
+        setLoadError("Could not load more posts.");
+      }
     });
   }
 
@@ -72,6 +82,11 @@ export function FeedTimeline({
             <span>{isPending ? "Loading…" : "Load more"}</span>
           </button>
         </div>
+      ) : null}
+      {loadError ? (
+        <p role="alert" style={{ color: "#c62828", textAlign: "center" }}>
+          {loadError}
+        </p>
       ) : null}
     </>
   );

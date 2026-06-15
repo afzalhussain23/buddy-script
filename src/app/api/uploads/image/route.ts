@@ -4,20 +4,19 @@ import { uuidv7 } from "uuidv7";
 import { db } from "@/db";
 import { imageUploads } from "@/db/social";
 import { auth } from "@/lib/auth";
-import {
-  ALLOWED_IMAGE_TYPES,
-  type AllowedImageType,
-  MAX_IMAGE_UPLOAD_BYTES,
-} from "@/lib/image-upload";
+import { imageUploadRequestSchema } from "@/lib/image-upload";
 import {
   createPresignedImageUpload,
   PENDING_UPLOAD_TTL_MS,
   R2ConfigurationError,
 } from "@/lib/r2";
 import { consumeRateLimit } from "@/lib/rate-limit";
+import { limitRequestBody, RequestBodyTooLargeError } from "@/lib/request-body";
+import { getFieldErrors, getValidationMessage } from "@/lib/validation";
 
 const UPLOAD_LIMIT = 10;
 const UPLOAD_LIMIT_WINDOW_MS = 10 * 60 * 1000;
+const MAX_METADATA_BODY_BYTES = 16 * 1024;
 
 function isAllowedOrigin(request: Request): boolean {
   const origin = request.headers.get("origin");
@@ -38,13 +37,6 @@ function isAllowedOrigin(request: Request): boolean {
   });
 }
 
-function isAllowedImageType(value: unknown): value is AllowedImageType {
-  return (
-    typeof value === "string" &&
-    ALLOWED_IMAGE_TYPES.some((type) => type === value)
-  );
-}
-
 export async function POST(request: Request) {
   if (!isAllowedOrigin(request)) {
     return NextResponse.json(
@@ -63,37 +55,31 @@ export async function POST(request: Request) {
 
   let body: unknown;
   try {
-    body = await request.json();
-  } catch {
+    body = await (
+      await limitRequestBody(request, MAX_METADATA_BODY_BYTES)
+    ).json();
+  } catch (error) {
+    if (error instanceof RequestBodyTooLargeError) {
+      return NextResponse.json(
+        { error: "Upload metadata is too large." },
+        { status: 413 },
+      );
+    }
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
 
-  const contentType =
-    typeof body === "object" && body !== null && "contentType" in body
-      ? body.contentType
-      : undefined;
-  const size =
-    typeof body === "object" && body !== null && "size" in body
-      ? body.size
-      : undefined;
-
-  if (!isAllowedImageType(contentType)) {
+  const parsed = imageUploadRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    const message = getValidationMessage(
+      parsed.error,
+      "Invalid upload metadata.",
+    );
     return NextResponse.json(
-      { error: "Only JPEG, PNG, WebP, and GIF images are allowed." },
+      { error: message, message, fieldErrors: getFieldErrors(parsed.error) },
       { status: 400 },
     );
   }
-  if (
-    typeof size !== "number" ||
-    !Number.isInteger(size) ||
-    size < 1 ||
-    size > MAX_IMAGE_UPLOAD_BYTES
-  ) {
-    return NextResponse.json(
-      { error: "Image must be between 1 byte and 5 MB." },
-      { status: 400 },
-    );
-  }
+  const { contentType, size } = parsed.data;
 
   const rateLimit = await consumeRateLimit({
     action: "image-upload",
