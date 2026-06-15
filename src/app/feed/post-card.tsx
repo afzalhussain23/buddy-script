@@ -8,7 +8,7 @@ import {
   toggleCommentLike,
   toggleLike,
 } from "./actions";
-import { CommentBox } from "./comment-box";
+import { CommentComposer, ReplyComposer } from "./comment-box";
 import {
   CommentIcon,
   postMenuItems,
@@ -300,7 +300,7 @@ export function PostCard({
             onReplyCreated={reconcileCommentCount}
           />
         ))}
-        <CommentBox
+        <CommentComposer
           avatar={avatarUrl(currentUserName)}
           postId={post.id}
           onCreated={handleCommentCreated}
@@ -524,7 +524,7 @@ function CommentRow({
           </p>
         ) : null}
         {replying ? (
-          <CommentBox
+          <ReplyComposer
             avatar={avatarUrl(currentUserName)}
             postId={comment.postId}
             parentId={comment.id}

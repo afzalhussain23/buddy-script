@@ -11,8 +11,44 @@ import { createComment, createReply } from "./actions";
 import { AttachIcon, SmileIcon } from "./feed-icons";
 import type { FeedComment } from "./queries";
 
-// The "Write a comment" composer, reused under each post and reply thread.
-export function CommentBox({
+type ComposerResult = Awaited<ReturnType<typeof createComment>>;
+type OnCreated = (comment: FeedComment, commentCount: number) => void;
+
+type ComposerFrameProps = {
+  avatar: string;
+  placeholder: string;
+  emptyError: string;
+  lengthError: string;
+  failureError: string;
+  submitLabel: string;
+  submit: (body: string) => Promise<ComposerResult>;
+  onCreated: OnCreated;
+};
+
+export function CommentComposer({
+  avatar,
+  postId,
+  onCreated,
+}: {
+  avatar: string;
+  postId: string;
+  onCreated: OnCreated;
+}) {
+  return (
+    <ComposerFrame
+      avatar={avatar}
+      placeholder="Write a comment"
+      emptyError="Write a comment before posting."
+      lengthError="Comment must be at most 2,000 characters."
+      failureError="Could not post comment. Please try again."
+      submitLabel="Post"
+      submit={(body) => createComment({ postId, body })}
+      onCreated={onCreated}
+    />
+  );
+}
+
+export function ReplyComposer({
   avatar,
   postId,
   parentId,
@@ -20,9 +56,33 @@ export function CommentBox({
 }: {
   avatar: string;
   postId: string;
-  parentId?: string;
-  onCreated: (comment: FeedComment, commentCount: number) => void;
+  parentId: string;
+  onCreated: OnCreated;
 }) {
+  return (
+    <ComposerFrame
+      avatar={avatar}
+      placeholder="Write a reply"
+      emptyError="Write a reply before posting."
+      lengthError="Reply must be at most 2,000 characters."
+      failureError="Could not post reply. Please try again."
+      submitLabel="Reply"
+      submit={(body) => createReply({ postId, parentId, body })}
+      onCreated={onCreated}
+    />
+  );
+}
+
+function ComposerFrame({
+  avatar,
+  placeholder,
+  emptyError,
+  lengthError,
+  failureError,
+  submitLabel,
+  submit,
+  onCreated,
+}: ComposerFrameProps) {
   const formRef = useRef<HTMLFormElement>(null);
   const [body, setBody] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -33,26 +93,18 @@ export function CommentBox({
     const nextBody = body.trim();
 
     if (!nextBody) {
-      setError(
-        parentId
-          ? "Write a reply before posting."
-          : "Write a comment before posting.",
-      );
+      setError(emptyError);
       return;
     }
     if (nextBody.length > 2000) {
-      setError(
-        `${parentId ? "Reply" : "Comment"} must be at most 2,000 characters.`,
-      );
+      setError(lengthError);
       return;
     }
 
     setError(null);
     startTransition(async () => {
       try {
-        const result = parentId
-          ? await createReply({ postId, parentId, body: nextBody })
-          : await createComment({ postId, body: nextBody });
+        const result = await submit(nextBody);
         if (result.ok) {
           setBody("");
           onCreated(result.comment, result.commentCount);
@@ -60,9 +112,7 @@ export function CommentBox({
           setError(result.error);
         }
       } catch {
-        setError(
-          `Could not post ${parentId ? "reply" : "comment"}. Please try again.`,
-        );
+        setError(failureError);
       }
     });
   }
@@ -89,8 +139,8 @@ export function CommentBox({
           <div className="_feed_inner_comment_box_content_txt">
             <textarea
               className="form-control _comment_textarea"
-              placeholder={parentId ? "Write a reply" : "Write a comment"}
-              aria-label={parentId ? "Write a reply" : "Write a comment"}
+              placeholder={placeholder}
+              aria-label={placeholder}
               maxLength={2000}
               value={body}
               onChange={(event) => setBody(event.target.value)}
@@ -112,7 +162,7 @@ export function CommentBox({
             disabled={isPending}
             style={{ fontSize: 13, fontWeight: 600 }}
           >
-            {isPending ? "Posting" : parentId ? "Reply" : "Post"}
+            {isPending ? "Posting" : submitLabel}
           </button>
         </div>
       </form>
