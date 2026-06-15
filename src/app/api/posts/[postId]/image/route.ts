@@ -50,7 +50,7 @@ export async function GET(
     const object = await getR2Object(post.imageObjectKey);
     return new Response(object.body, {
       headers: {
-        "Cache-Control": "private, no-store",
+        "Cache-Control": "private, max-age=300",
         ...(object.contentLength === undefined
           ? {}
           : { "Content-Length": String(object.contentLength) }),
