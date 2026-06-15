@@ -1,4 +1,5 @@
 import { headers } from "next/headers";
+import Image from "next/image";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { auth } from "@/lib/auth";
@@ -81,11 +82,12 @@ export default async function FeedPage() {
                           <div className="_left_inner_area_suggest_info_box">
                             <div className="_left_inner_area_suggest_info_image">
                               <a href="#0">
-                                {/* biome-ignore lint/performance/noImgElement: theme markup parity */}
-                                <img
+                                <Image
                                   src={p.image}
                                   alt=""
                                   className="_info_img"
+                                  width={40}
+                                  height={40}
                                 />
                               </a>
                             </div>
@@ -124,11 +126,13 @@ export default async function FeedPage() {
                         <div className="_left_inner_event_card_link" key={i}>
                           <div className="_left_inner_event_card">
                             <div className="_left_inner_event_card_iamge">
-                              {/* biome-ignore lint/performance/noImgElement: theme markup parity */}
-                              <img
+                              <Image
                                 src="/assets/images/feed_event1.png"
                                 alt=""
                                 className="_card_img"
+                                width={528}
+                                height={320}
+                                sizes="(max-width: 991px) 100vw, 25vw"
                               />
                             </div>
                             <div className="_left_inner_event_card_content">
@@ -181,11 +185,13 @@ export default async function FeedPage() {
                         <div className="col-xl-3 col-lg-3 col-md-4 col-sm-4 col">
                           <div className="_feed_inner_profile_story _b_radious6">
                             <div className="_feed_inner_profile_story_image">
-                              {/* biome-ignore lint/performance/noImgElement: theme markup parity */}
-                              <img
+                              <Image
                                 src="/assets/images/card_ppl1.png"
                                 alt=""
                                 className="_profile_story_img"
+                                width={300}
+                                height={330}
+                                sizes="(max-width: 767px) 33vw, 13vw"
                               />
                               <div className="_feed_inner_story_txt">
                                 <div className="_feed_inner_story_btn">
@@ -223,11 +229,13 @@ export default async function FeedPage() {
                           >
                             <div className="_feed_inner_public_story _b_radious6">
                               <div className="_feed_inner_public_story_image">
-                                {/* biome-ignore lint/performance/noImgElement: theme markup parity */}
-                                <img
+                                <Image
                                   src={s.image}
                                   alt=""
                                   className="_public_story_img"
+                                  width={300}
+                                  height={330}
+                                  sizes="(max-width: 767px) 33vw, 13vw"
                                 />
                                 <div className="_feed_inner_pulic_story_txt">
                                   <p className="_feed_inner_pulic_story_para">
@@ -236,11 +244,12 @@ export default async function FeedPage() {
                                 </div>
                                 {s.mini ? (
                                   <div className="_feed_inner_public_mini">
-                                    {/* biome-ignore lint/performance/noImgElement: theme markup parity */}
-                                    <img
+                                    <Image
                                       src={s.mini}
                                       alt=""
                                       className="_public_mini_img"
+                                      width={28}
+                                      height={28}
                                     />
                                   </div>
                                 ) : null}
@@ -289,11 +298,12 @@ export default async function FeedPage() {
                           <div className="_right_inner_area_info_box">
                             <div className="_right_inner_area_info_box_image">
                               <a href="#0">
-                                {/* biome-ignore lint/performance/noImgElement: theme markup parity */}
-                                <img
+                                <Image
                                   src={p.image}
                                   alt=""
                                   className="_ppl_img"
+                                  width={50}
+                                  height={50}
                                 />
                               </a>
                             </div>
@@ -377,11 +387,12 @@ export default async function FeedPage() {
                             <div className="_feed_right_inner_area_card_ppl_box">
                               <div className="_feed_right_inner_area_card_ppl_image">
                                 <a href="#0">
-                                  {/* biome-ignore lint/performance/noImgElement: theme markup parity */}
-                                  <img
+                                  <Image
                                     src={f.image}
                                     alt=""
                                     className="_box_ppl_img"
+                                    width={40}
+                                    height={40}
                                   />
                                 </a>
                               </div>

@@ -65,6 +65,8 @@ export type FeedPost = {
   authorImage: string | null;
   body: string;
   imageUrl: string | null;
+  imageWidth: number | null;
+  imageHeight: number | null;
   isPrivate: boolean;
   likeCount: number;
   likedByMe: boolean;
@@ -224,6 +226,8 @@ export async function getFeedPage(
       id: posts.id,
       body: posts.body,
       imageUrl: posts.imageUrl,
+      imageWidth: posts.imageWidth,
+      imageHeight: posts.imageHeight,
       isPrivate: posts.isPrivate,
       likeCount: posts.likeCount,
       // Correlate the viewer's own like row only (the join is keyed on
@@ -328,6 +332,8 @@ export async function getFeedPage(
       authorImage: r.authorImage,
       body: r.body,
       imageUrl: r.imageUrl,
+      imageWidth: r.imageWidth,
+      imageHeight: r.imageHeight,
       isPrivate: r.isPrivate,
       likeCount: r.likeCount,
       likedByMe: r.likedByMe,

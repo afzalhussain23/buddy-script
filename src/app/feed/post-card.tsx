@@ -1,7 +1,8 @@
 "use client";
 
+import Image from "next/image";
 import { memo, useEffect, useRef, useState, useTransition } from "react";
-import { avatarUrl } from "@/lib/avatar";
+import { Avatar } from "@/components/avatar";
 import {
   loadMoreComments,
   loadMoreReplies,
@@ -121,10 +122,10 @@ export const PostCard = memo(function PostCard({
         <div className="_feed_inner_timeline_post_top">
           <div className="_feed_inner_timeline_post_box">
             <div className="_feed_inner_timeline_post_box_image">
-              {/* biome-ignore lint/performance/noImgElement: theme markup parity */}
-              <img
-                src={post.authorImage ?? avatarUrl(post.authorName)}
-                alt=""
+              <Avatar
+                name={post.authorName}
+                image={post.authorImage}
+                size={44}
                 className="_post_img"
               />
             </div>
@@ -167,8 +168,25 @@ export const PostCard = memo(function PostCard({
         <h4 className="_feed_inner_timeline_post_title">{post.body}</h4>
         {post.imageUrl ? (
           <div className="_feed_inner_timeline_image">
-            {/* biome-ignore lint/performance/noImgElement: theme markup parity */}
-            <img src={post.imageUrl} alt="" className="_time_img" />
+            {post.imageWidth && post.imageHeight ? (
+              <Image
+                src={post.imageUrl}
+                alt=""
+                className="_time_img"
+                width={post.imageWidth}
+                height={post.imageHeight}
+                sizes="(max-width: 991px) calc(100vw - 48px), 50vw"
+                style={{ height: "auto" }}
+              />
+            ) : (
+              // biome-ignore lint/performance/noImgElement: legacy images have no stored dimensions
+              <img
+                src={post.imageUrl}
+                alt=""
+                className="_time_img"
+                style={{ height: "auto" }}
+              />
+            )}
           </div>
         ) : null}
       </div>
@@ -303,7 +321,7 @@ export const PostCard = memo(function PostCard({
           />
         ))}
         <CommentComposer
-          avatar={avatarUrl(currentUserName)}
+          name={currentUserName}
           postId={post.id}
           onCreated={handleCommentCreated}
         />
@@ -458,10 +476,10 @@ function CommentRow({
     <div className="_mar_b16">
       <div className="_comment_main">
         <div className="_comment_image">
-          {/* biome-ignore lint/performance/noImgElement: theme markup parity */}
-          <img
-            src={comment.authorImage ?? avatarUrl(comment.authorName)}
-            alt=""
+          <Avatar
+            name={comment.authorName}
+            image={comment.authorImage}
+            size={40}
             className="_comment_img1"
           />
         </div>
@@ -527,7 +545,7 @@ function CommentRow({
         ) : null}
         {replying ? (
           <ReplyComposer
-            avatar={avatarUrl(currentUserName)}
+            name={currentUserName}
             postId={comment.postId}
             parentId={comment.id}
             onCreated={handleReplyCreated}
@@ -542,10 +560,10 @@ function ReplyRow({ reply }: { reply: FeedComment }) {
   return (
     <div className="_comment_main _mar_b16">
       <div className="_comment_image">
-        {/* biome-ignore lint/performance/noImgElement: theme markup parity */}
-        <img
-          src={reply.authorImage ?? avatarUrl(reply.authorName)}
-          alt=""
+        <Avatar
+          name={reply.authorName}
+          image={reply.authorImage}
+          size={40}
           className="_comment_img1"
         />
       </div>

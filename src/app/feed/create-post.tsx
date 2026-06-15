@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { avatarUrl } from "@/lib/avatar";
+import { Avatar } from "@/components/avatar";
 import { MAX_IMAGE_UPLOAD_BYTES, uploadImageToR2 } from "@/lib/image-upload";
 import { createPost } from "./actions";
 import {
@@ -66,8 +66,7 @@ export function CreatePost({
     <div className="_feed_inner_text_area _b_radious6 _padd_b24 _padd_t24 _padd_r24 _padd_l24 _mar_b16">
       <div className="_feed_inner_text_area_box">
         <div className="_feed_inner_text_area_box_image">
-          {/* biome-ignore lint/performance/noImgElement: theme markup parity */}
-          <img src={avatarUrl(currentUserName)} alt="" className="_txt_img" />
+          <Avatar name={currentUserName} size={40} className="_txt_img" />
         </div>
         <div className="form-floating _feed_inner_text_area_box_form">
           <textarea

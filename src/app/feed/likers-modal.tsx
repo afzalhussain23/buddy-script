@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
-import { avatarUrl } from "@/lib/avatar";
+import { Avatar } from "@/components/avatar";
 import { loadLikers } from "./actions";
 import { ThumbsUpIcon } from "./feed-icons";
 import type { Liker, LikerCursor } from "./queries";
@@ -179,17 +179,7 @@ export function LikersModal({
                 padding: "8px 20px",
               }}
             >
-              {/* biome-ignore lint/performance/noImgElement: theme markup parity */}
-              <img
-                src={liker.image ?? avatarUrl(liker.name)}
-                alt=""
-                style={{
-                  borderRadius: "50%",
-                  height: 40,
-                  objectFit: "cover",
-                  width: 40,
-                }}
-              />
+              <Avatar name={liker.name} image={liker.image} size={40} />
               <span style={{ fontSize: 14, fontWeight: 500 }}>
                 {liker.name}
               </span>

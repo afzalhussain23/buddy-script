@@ -11,7 +11,12 @@ import {
   S3Client,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import type { AllowedImageType } from "./image-upload";
+import { getImageDimensions, type ImageDimensions } from "./image-dimensions";
+import {
+  type AllowedImageType,
+  MAX_IMAGE_DIMENSION,
+  MAX_IMAGE_PIXELS,
+} from "./image-upload";
 
 const EXTENSIONS: Record<AllowedImageType, string> = {
   "image/jpeg": "jpg",
@@ -21,6 +26,10 @@ const EXTENSIONS: Record<AllowedImageType, string> = {
 };
 
 const PRESIGNED_URL_TTL_SECONDS = 5 * 60;
+// Signature and dimensions live near the start for every supported format, but a
+// JPEG's SOF marker can sit after large EXIF/ICC segments. Read this prefix and
+// fall back to the full object only when the dimensions aren't found within it.
+const HEADER_PREFIX_BYTES = 256 * 1024;
 export const PENDING_UPLOAD_TTL_MS = 60 * 60 * 1000;
 
 type R2Config = {
@@ -115,7 +124,7 @@ export async function verifyAndPublishImageUpload(upload: {
   publishedObjectKey: string;
   contentType: string;
   expectedSize: number;
-}): Promise<void> {
+}): Promise<ImageDimensions> {
   const config = getR2Config();
   const client = getR2Client(config);
   let object: HeadObjectCommandOutput;
@@ -141,18 +150,39 @@ export async function verifyAndPublishImageUpload(upload: {
     );
   }
 
-  const content = await client.send(
-    new GetObjectCommand({
-      Bucket: config.bucket,
-      Key: upload.pendingObjectKey,
-      Range: "bytes=0-15",
-    }),
+  let bytes = await getObjectBytes(
+    client,
+    config.bucket,
+    upload.pendingObjectKey,
+    `bytes=0-${HEADER_PREFIX_BYTES - 1}`,
   );
-  const signature = await content.Body?.transformToByteArray();
-  if (!signature || !matchesImageSignature(signature, upload.contentType)) {
+  if (!bytes || !matchesImageSignature(bytes, upload.contentType)) {
     await deleteR2Object(upload.pendingObjectKey).catch(() => undefined);
     throw new R2UploadVerificationError(
       "The uploaded file content is not a valid supported image.",
+    );
+  }
+  let dimensions = getImageDimensions(bytes);
+  // A null result on a truncated prefix may just mean the dimensions sit beyond
+  // it (e.g. a JPEG SOF after heavy metadata); re-read the full object before
+  // treating the image as invalid.
+  if (!dimensions && bytes.length >= HEADER_PREFIX_BYTES) {
+    bytes = await getObjectBytes(
+      client,
+      config.bucket,
+      upload.pendingObjectKey,
+    );
+    dimensions = bytes ? getImageDimensions(bytes) : null;
+  }
+  if (
+    !dimensions ||
+    dimensions.width > MAX_IMAGE_DIMENSION ||
+    dimensions.height > MAX_IMAGE_DIMENSION ||
+    dimensions.width * dimensions.height > MAX_IMAGE_PIXELS
+  ) {
+    await deleteR2Object(upload.pendingObjectKey).catch(() => undefined);
+    throw new R2UploadVerificationError(
+      "The image dimensions are invalid or too large.",
     );
   }
 
@@ -165,6 +195,20 @@ export async function verifyAndPublishImageUpload(upload: {
       MetadataDirective: "REPLACE",
     }),
   );
+
+  return dimensions;
+}
+
+async function getObjectBytes(
+  client: S3Client,
+  bucket: string,
+  key: string,
+  range?: string,
+): Promise<Uint8Array | undefined> {
+  const object = await client.send(
+    new GetObjectCommand({ Bucket: bucket, Key: key, Range: range }),
+  );
+  return object.Body?.transformToByteArray();
 }
 
 function matchesImageSignature(

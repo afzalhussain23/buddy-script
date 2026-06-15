@@ -13,6 +13,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { uuidv7 } from "uuidv7";
+import { MAX_IMAGE_DIMENSION, MAX_IMAGE_PIXELS } from "../lib/image-upload";
 import { user } from "./auth";
 
 export const posts = pgTable(
@@ -26,6 +27,8 @@ export const posts = pgTable(
     }),
     body: text("body").notNull(),
     imageUrl: text("image_url"),
+    imageWidth: integer("image_width"),
+    imageHeight: integer("image_height"),
     isPrivate: boolean("is_private").default(false).notNull(),
     likeCount: integer("like_count").default(0).notNull(),
     commentCount: integer("comment_count").default(0).notNull(),
@@ -54,6 +57,10 @@ export const posts = pgTable(
     uniqueIndex("posts_image_url_unique_idx")
       .on(table.imageUrl)
       .where(sql`${table.imageUrl} is not null`),
+    check(
+      "posts_image_dimensions_check",
+      sql`(${table.imageWidth} is null and ${table.imageHeight} is null) or (${table.imageWidth} between 1 and ${sql.raw(String(MAX_IMAGE_DIMENSION))} and ${table.imageHeight} between 1 and ${sql.raw(String(MAX_IMAGE_DIMENSION))} and ${table.imageWidth} * ${table.imageHeight} <= ${sql.raw(String(MAX_IMAGE_PIXELS))})`,
+    ),
   ],
 );
 

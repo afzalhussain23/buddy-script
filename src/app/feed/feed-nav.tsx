@@ -1,9 +1,10 @@
 "use client";
 
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { Avatar } from "@/components/avatar";
 import { authClient } from "@/lib/auth-client";
-import { avatarUrl } from "@/lib/avatar";
 
 const notifications = [
   {
@@ -78,11 +79,12 @@ export function FeedNav({ name }: { name: string }) {
         <div className="container _custom_container">
           <div className="_logo_wrap">
             <a className="navbar-brand" href="/feed">
-              {/* biome-ignore lint/performance/noImgElement: theme markup parity */}
-              <img
+              <Image
                 src="/assets/images/logo.svg"
                 alt="Buddy Script"
                 className="_nav_logo"
+                width={158}
+                height={33}
               />
             </a>
           </div>
@@ -233,8 +235,13 @@ export function FeedNav({ name }: { name: string }) {
                           key={`${n.image}-${i}`}
                         >
                           <div className="_notification_image">
-                            {/* biome-ignore lint/performance/noImgElement: theme markup parity */}
-                            <img src={n.image} alt="" className="_notify_img" />
+                            <Image
+                              src={n.image}
+                              alt=""
+                              className="_notify_img"
+                              width={56}
+                              height={56}
+                            />
                           </div>
                           <div className="_notification_txt">
                             {n.kind === "link" ? (
@@ -294,12 +301,7 @@ export function FeedNav({ name }: { name: string }) {
             </ul>
             <div className="_header_nav_profile" ref={profileRef}>
               <div className="_header_nav_profile_image">
-                {/* biome-ignore lint/performance/noImgElement: theme markup parity */}
-                <img
-                  src={avatarUrl(name)}
-                  alt=""
-                  className="_nav_profile_img"
-                />
+                <Avatar name={name} size={24} className="_nav_profile_img" />
               </div>
               <button
                 className="_header_nav_dropdown"
@@ -334,12 +336,7 @@ export function FeedNav({ name }: { name: string }) {
               >
                 <div className="_nav_profile_dropdown_info">
                   <div className="_nav_profile_dropdown_image">
-                    {/* biome-ignore lint/performance/noImgElement: theme markup parity */}
-                    <img
-                      src={avatarUrl(name)}
-                      alt=""
-                      className="_nav_drop_img"
-                    />
+                    <Avatar name={name} size={54} className="_nav_drop_img" />
                   </div>
                   <div className="_nav_profile_dropdown_info_txt">
                     <h4 className="_nav_dropdown_title">{name}</h4>
@@ -395,11 +392,12 @@ export function FeedNav({ name }: { name: string }) {
                   <div className="_header_mobile_menu_top_inner">
                     <div className="_header_mobile_menu_logo">
                       <a href="/feed">
-                        {/* biome-ignore lint/performance/noImgElement: theme markup parity */}
-                        <img
+                        <Image
                           src="/assets/images/logo.svg"
-                          alt=""
+                          alt="Buddy Script"
                           className="_nav_logo"
+                          width={158}
+                          height={33}
                         />
                       </a>
                     </div>

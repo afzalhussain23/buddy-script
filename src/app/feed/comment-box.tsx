@@ -7,6 +7,7 @@ import {
   useState,
   useTransition,
 } from "react";
+import { Avatar } from "@/components/avatar";
 import { createComment, createReply } from "./actions";
 import { AttachIcon, SmileIcon } from "./feed-icons";
 import type { FeedComment } from "./queries";
@@ -15,7 +16,7 @@ type ComposerResult = Awaited<ReturnType<typeof createComment>>;
 type OnCreated = (comment: FeedComment, commentCount: number) => void;
 
 type ComposerFrameProps = {
-  avatar: string;
+  name: string;
   placeholder: string;
   emptyError: string;
   lengthError: string;
@@ -26,17 +27,17 @@ type ComposerFrameProps = {
 };
 
 export function CommentComposer({
-  avatar,
+  name,
   postId,
   onCreated,
 }: {
-  avatar: string;
+  name: string;
   postId: string;
   onCreated: OnCreated;
 }) {
   return (
     <ComposerFrame
-      avatar={avatar}
+      name={name}
       placeholder="Write a comment"
       emptyError="Write a comment before posting."
       lengthError="Comment must be at most 2,000 characters."
@@ -49,19 +50,19 @@ export function CommentComposer({
 }
 
 export function ReplyComposer({
-  avatar,
+  name,
   postId,
   parentId,
   onCreated,
 }: {
-  avatar: string;
+  name: string;
   postId: string;
   parentId: string;
   onCreated: OnCreated;
 }) {
   return (
     <ComposerFrame
-      avatar={avatar}
+      name={name}
       placeholder="Write a reply"
       emptyError="Write a reply before posting."
       lengthError="Reply must be at most 2,000 characters."
@@ -74,7 +75,7 @@ export function ReplyComposer({
 }
 
 function ComposerFrame({
-  avatar,
+  name,
   placeholder,
   emptyError,
   lengthError,
@@ -133,8 +134,7 @@ function ComposerFrame({
       >
         <div className="_feed_inner_comment_box_content">
           <div className="_feed_inner_comment_box_content_image">
-            {/* biome-ignore lint/performance/noImgElement: theme markup parity */}
-            <img src={avatar} alt="" className="_comment_img" />
+            <Avatar name={name} size={26} className="_comment_img" />
           </div>
           <div className="_feed_inner_comment_box_content_txt">
             <textarea

@@ -59,6 +59,8 @@ function toFeedPost(
     authorImage: author.image ?? null,
     body: row.body,
     imageUrl: row.imageUrl,
+    imageWidth: row.imageWidth,
+    imageHeight: row.imageHeight,
     isPrivate: row.isPrivate,
     likeCount: row.likeCount,
     // A just-created post starts unliked, even for its author.
@@ -128,8 +130,9 @@ export async function createPost(input: {
     return { ok: false, error: "This image upload is invalid or expired." };
   }
 
+  let imageDimensions: { width: number; height: number };
   try {
-    await verifyAndPublishImageUpload(upload);
+    imageDimensions = await verifyAndPublishImageUpload(upload);
   } catch (error) {
     await db
       .update(imageUploads)
@@ -160,6 +163,8 @@ export async function createPost(input: {
           authorId: session.user.id,
           body,
           imageUrl: upload.publicUrl,
+          imageWidth: imageDimensions.width,
+          imageHeight: imageDimensions.height,
         })
         .returning(),
       db

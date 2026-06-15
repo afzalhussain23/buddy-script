@@ -1,5 +1,11 @@
 export const MAX_IMAGE_UPLOAD_BYTES = 5 * 1024 * 1024;
 
+// Bounds for stored post-image dimensions. Single source of truth shared by the
+// server-side upload verification (src/lib/r2.ts) and the DB CHECK constraint
+// (src/db/social.ts) so the two can never drift.
+export const MAX_IMAGE_DIMENSION = 16_384;
+export const MAX_IMAGE_PIXELS = 40_000_000;
+
 export const ALLOWED_IMAGE_TYPES = [
   "image/jpeg",
   "image/png",
