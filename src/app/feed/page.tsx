@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import { auth } from "@/lib/auth";
 import { DarkModeToggle } from "./dark-mode-toggle";
 import { friends, stories, suggestedPeople, youMightLike } from "./feed-data";
@@ -14,8 +15,6 @@ export default async function FeedPage() {
   if (!session) {
     redirect("/login");
   }
-
-  const { posts, nextCursor } = await getFeedPage(session.user.id);
 
   return (
     <div className="_layout _layout_main_wrapper">
@@ -253,11 +252,12 @@ export default async function FeedPage() {
                     </div>
 
                     {/* Create post + timeline */}
-                    <FeedTimeline
-                      initialPosts={posts}
-                      initialCursor={nextCursor}
-                      currentUserName={session.user.name}
-                    />
+                    <Suspense fallback={<TimelineSkeleton />}>
+                      <FeedTimelineLoader
+                        userId={session.user.id}
+                        currentUserName={session.user.name}
+                      />
+                    </Suspense>
                   </div>
                 </div>
               </div>
@@ -432,6 +432,34 @@ export default async function FeedPage() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+async function FeedTimelineLoader({
+  userId,
+  currentUserName,
+}: {
+  userId: string;
+  currentUserName: string;
+}) {
+  const { posts, nextCursor } = await getFeedPage(userId);
+
+  return (
+    <FeedTimeline
+      initialPosts={posts}
+      initialCursor={nextCursor}
+      currentUserName={currentUserName}
+    />
+  );
+}
+
+function TimelineSkeleton() {
+  return (
+    <div className="_feed_inner_timeline_post_area _b_radious6 _padd_b24 _padd_t24 _padd_r24 _padd_l24 _mar_b16">
+      <p className="_feed_inner_timeline_post_box_para" style={{ margin: 0 }}>
+        Loading feed...
+      </p>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { memo, useEffect, useRef, useState, useTransition } from "react";
 import { avatarUrl } from "@/lib/avatar";
 import {
   loadMoreComments,
@@ -19,7 +19,7 @@ import {
 import { LikersModal } from "./likers-modal";
 import type { FeedComment, FeedPost } from "./queries";
 
-export function PostCard({
+export const PostCard = memo(function PostCard({
   post,
   currentUserName,
 }: {
@@ -104,6 +104,8 @@ export function PostCard({
 
   // Close the post's "..." menu on an outside click.
   useEffect(() => {
+    if (!menuOpen) return;
+
     function onClick(e: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setMenuOpen(false);
@@ -111,7 +113,7 @@ export function PostCard({
     }
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
-  }, []);
+  }, [menuOpen]);
 
   return (
     <div className="_feed_inner_timeline_post_area _b_radious6 _padd_b24 _padd_t24 _mar_b16">
@@ -308,7 +310,7 @@ export function PostCard({
       </div>
     </div>
   );
-}
+});
 
 // Per-comment like toggle for both comments and replies. Mirrors the post
 // like button: optimistic flip + count, reconciled with the server's
