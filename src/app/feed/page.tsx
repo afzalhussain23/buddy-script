@@ -261,6 +261,7 @@ export default async function FeedPage() {
                     <FeedTimeline
                       initialPosts={posts}
                       initialCursor={nextCursor}
+                      currentUserName={session.user.name}
                     />
                   </div>
                 </div>

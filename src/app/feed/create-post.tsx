@@ -1,14 +1,17 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
+import { avatarUrl } from "@/lib/avatar";
 import { MAX_IMAGE_UPLOAD_BYTES, uploadImageToR2 } from "@/lib/image-upload";
 import { createPost } from "./actions";
 import type { FeedPost } from "./queries";
 
 export function CreatePost({
   onCreated,
+  currentUserName,
 }: {
   onCreated: (post: FeedPost) => void;
+  currentUserName: string;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [body, setBody] = useState("");
@@ -56,7 +59,7 @@ export function CreatePost({
       <div className="_feed_inner_text_area_box">
         <div className="_feed_inner_text_area_box_image">
           {/* biome-ignore lint/performance/noImgElement: theme markup parity */}
-          <img src="/assets/images/txt_img.png" alt="" className="_txt_img" />
+          <img src={avatarUrl(currentUserName)} alt="" className="_txt_img" />
         </div>
         <div className="form-floating _feed_inner_text_area_box_form">
           <textarea

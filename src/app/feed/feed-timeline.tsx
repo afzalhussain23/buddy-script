@@ -12,9 +12,11 @@ import type { FeedCursor, FeedPost } from "./queries";
 export function FeedTimeline({
   initialPosts,
   initialCursor,
+  currentUserName,
 }: {
   initialPosts: FeedPost[];
   initialCursor: FeedCursor | null;
+  currentUserName: string;
 }) {
   const [posts, setPosts] = useState(initialPosts);
   const [cursor, setCursor] = useState(initialCursor);
@@ -35,7 +37,7 @@ export function FeedTimeline({
 
   return (
     <>
-      <CreatePost onCreated={handleCreated} />
+      <CreatePost onCreated={handleCreated} currentUserName={currentUserName} />
 
       {posts.length === 0 ? (
         <div className="_feed_inner_timeline_post_area _b_radious6 _padd_b24 _padd_t24 _padd_r24 _padd_l24 _mar_b16">
@@ -47,7 +49,13 @@ export function FeedTimeline({
           </p>
         </div>
       ) : (
-        posts.map((post) => <PostCard key={post.id} post={post} />)
+        posts.map((post) => (
+          <PostCard
+            key={post.id}
+            post={post}
+            currentUserName={currentUserName}
+          />
+        ))
       )}
 
       {cursor ? (

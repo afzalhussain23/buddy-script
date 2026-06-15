@@ -2,12 +2,10 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
+import { avatarUrl } from "@/lib/avatar";
 import { loadLikers } from "./actions";
 import { ThumbsUpIcon } from "./feed-icons";
 import type { Liker, LikerCursor } from "./queries";
-
-// Fallback avatar, matching the feed (user images aren't uploaded yet).
-const DEFAULT_AVATAR = "/assets/images/comment_img.png";
 
 // "Who liked this" modal for a post, comment, or reply. Data is fetched lazily
 // on open (never preloaded with the feed) and paginated newest-first. Rendered
@@ -183,7 +181,7 @@ export function LikersModal({
             >
               {/* biome-ignore lint/performance/noImgElement: theme markup parity */}
               <img
-                src={liker.image ?? DEFAULT_AVATAR}
+                src={liker.image ?? avatarUrl(liker.name)}
                 alt=""
                 style={{
                   borderRadius: "50%",

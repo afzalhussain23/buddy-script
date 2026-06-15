@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import { avatarUrl } from "@/lib/avatar";
 import {
   loadMoreComments,
   loadMoreReplies,
@@ -18,10 +19,13 @@ import {
 import { LikersModal } from "./likers-modal";
 import type { FeedComment, FeedPost } from "./queries";
 
-// Fallback avatar (user images aren't uploaded yet — see auth.user.image).
-const DEFAULT_AVATAR = "/assets/images/post_img.png";
-
-export function PostCard({ post }: { post: FeedPost }) {
+export function PostCard({
+  post,
+  currentUserName,
+}: {
+  post: FeedPost;
+  currentUserName: string;
+}) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -117,7 +121,7 @@ export function PostCard({ post }: { post: FeedPost }) {
             <div className="_feed_inner_timeline_post_box_image">
               {/* biome-ignore lint/performance/noImgElement: theme markup parity */}
               <img
-                src={post.authorImage ?? DEFAULT_AVATAR}
+                src={post.authorImage ?? avatarUrl(post.authorName)}
                 alt=""
                 className="_post_img"
               />
@@ -250,6 +254,7 @@ export function PostCard({ post }: { post: FeedPost }) {
           <CommentRow
             key={comment.id}
             comment={comment}
+            currentUserName={currentUserName}
             onReplyCreated={reconcileCommentCount}
           />
         ))}
@@ -283,11 +288,12 @@ export function PostCard({ post }: { post: FeedPost }) {
           <CommentRow
             key={comment.id}
             comment={comment}
+            currentUserName={currentUserName}
             onReplyCreated={reconcileCommentCount}
           />
         ))}
         <CommentBox
-          avatar="/assets/images/comment_img.png"
+          avatar={avatarUrl(currentUserName)}
           postId={post.id}
           onCreated={handleCommentCreated}
         />
@@ -386,9 +392,11 @@ function CommentLikeButton({ comment }: { comment: FeedComment }) {
 
 function CommentRow({
   comment,
+  currentUserName,
   onReplyCreated,
 }: {
   comment: FeedComment;
+  currentUserName: string;
   onReplyCreated: (commentCount: number) => void;
 }) {
   const [replying, setReplying] = useState(false);
@@ -442,7 +450,7 @@ function CommentRow({
         <div className="_comment_image">
           {/* biome-ignore lint/performance/noImgElement: theme markup parity */}
           <img
-            src={comment.authorImage ?? DEFAULT_AVATAR}
+            src={comment.authorImage ?? avatarUrl(comment.authorName)}
             alt=""
             className="_comment_img1"
           />
@@ -509,7 +517,7 @@ function CommentRow({
         ) : null}
         {replying ? (
           <CommentBox
-            avatar="/assets/images/comment_img.png"
+            avatar={avatarUrl(currentUserName)}
             postId={comment.postId}
             parentId={comment.id}
             onCreated={handleReplyCreated}
@@ -526,7 +534,7 @@ function ReplyRow({ reply }: { reply: FeedComment }) {
       <div className="_comment_image">
         {/* biome-ignore lint/performance/noImgElement: theme markup parity */}
         <img
-          src={reply.authorImage ?? DEFAULT_AVATAR}
+          src={reply.authorImage ?? avatarUrl(reply.authorName)}
           alt=""
           className="_comment_img1"
         />

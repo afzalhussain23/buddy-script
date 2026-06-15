@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { authClient } from "@/lib/auth-client";
+import { avatarUrl } from "@/lib/avatar";
 
 const notifications = [
   {
@@ -296,7 +297,7 @@ export function FeedNav({ name }: { name: string }) {
               <div className="_header_nav_profile_image">
                 {/* biome-ignore lint/performance/noImgElement: theme markup parity */}
                 <img
-                  src="/assets/images/profile.png"
+                  src={avatarUrl(name)}
                   alt=""
                   className="_nav_profile_img"
                 />
@@ -330,7 +331,7 @@ export function FeedNav({ name }: { name: string }) {
                   <div className="_nav_profile_dropdown_image">
                     {/* biome-ignore lint/performance/noImgElement: theme markup parity */}
                     <img
-                      src="/assets/images/profile.png"
+                      src={avatarUrl(name)}
                       alt=""
                       className="_nav_drop_img"
                     />
