@@ -10,32 +10,32 @@ const notifications = [
   {
     image: "/assets/images/friend-req.png",
     kind: "link" as const,
-    time: "42 miniutes ago",
+    time: "42 minutes ago",
   },
   {
     image: "/assets/images/profile-1.png",
     kind: "group" as const,
-    time: "42 miniutes ago",
+    time: "42 minutes ago",
   },
   {
     image: "/assets/images/friend-req.png",
     kind: "link" as const,
-    time: "42 miniutes ago",
+    time: "42 minutes ago",
   },
   {
     image: "/assets/images/profile-1.png",
     kind: "group" as const,
-    time: "42 miniutes ago",
+    time: "42 minutes ago",
   },
   {
     image: "/assets/images/friend-req.png",
     kind: "link" as const,
-    time: "42 miniutes ago",
+    time: "42 minutes ago",
   },
   {
     image: "/assets/images/profile-1.png",
     kind: "group" as const,
-    time: "42 miniutes ago",
+    time: "42 minutes ago",
   },
 ];
 
@@ -47,7 +47,7 @@ export function FeedNav({ name }: { name: string }) {
   const notifyRef = useRef<HTMLLIElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
 
-  // Close either dropdown when clicking outside of it.
+  // Close either dropdown on an outside click or the Escape key.
   useEffect(() => {
     function onClick(e: MouseEvent) {
       const t = e.target as Node;
@@ -58,8 +58,18 @@ export function FeedNav({ name }: { name: string }) {
         setProfileOpen(false);
       }
     }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setNotifyOpen(false);
+        setProfileOpen(false);
+      }
+    }
     document.addEventListener("mousedown", onClick);
-    return () => document.removeEventListener("mousedown", onClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onClick);
+      document.removeEventListener("keydown", onKey);
+    };
   }, []);
 
   async function handleLogout() {
@@ -117,7 +127,9 @@ export function FeedNav({ name }: { name: string }) {
                 <input
                   className="form-control me-2 _inpt1"
                   type="search"
-                  placeholder="input search text"
+                  name="search"
+                  autoComplete="off"
+                  placeholder="Search"
                   aria-label="Search"
                 />
               </form>
@@ -158,9 +170,9 @@ export function FeedNav({ name }: { name: string }) {
                 </a>
               </li>
               <li className="nav-item _header_nav_item">
-                <a
-                  className="nav-link _header_nav_link"
-                  href="#0"
+                <button
+                  type="button"
+                  className="nav-link _header_nav_link _as_button"
                   aria-label="Friend requests"
                 >
                   <svg
@@ -180,13 +192,14 @@ export function FeedNav({ name }: { name: string }) {
                     />
                   </svg>
                   <span className="visually-hidden">Friend requests</span>
-                </a>
+                </button>
               </li>
               <li className="nav-item _header_nav_item" ref={notifyRef}>
                 <button
                   type="button"
                   className="nav-link _header_nav_link _header_notify_btn"
-                  aria-label="Notifications"
+                  aria-label="Notifications (6 unread)"
+                  aria-haspopup="menu"
                   aria-expanded={notifyOpen}
                   onClick={() => setNotifyOpen((v) => !v)}
                 >
@@ -206,7 +219,9 @@ export function FeedNav({ name }: { name: string }) {
                       clipRule="evenodd"
                     />
                   </svg>
-                  <span className="_counting">6</span>
+                  <span aria-hidden="true" className="_counting">
+                    6
+                  </span>
                 </button>
                 <div
                   className={`_notification_dropdown${notifyOpen ? " show" : ""}`}
@@ -274,10 +289,10 @@ export function FeedNav({ name }: { name: string }) {
                 </div>
               </li>
               <li className="nav-item _header_nav_item">
-                <a
-                  className="nav-link _header_nav_link"
-                  href="#0"
-                  aria-label="Messages"
+                <button
+                  type="button"
+                  className="nav-link _header_nav_link _as_button"
+                  aria-label="Messages (2 unread)"
                 >
                   <svg
                     aria-hidden="true"
@@ -295,8 +310,10 @@ export function FeedNav({ name }: { name: string }) {
                       clipRule="evenodd"
                     />
                   </svg>
-                  <span className="_counting">2</span>
-                </a>
+                  <span aria-hidden="true" className="_counting">
+                    2
+                  </span>
+                </button>
               </li>
             </ul>
             <div className="_header_nav_profile" ref={profileRef}>
@@ -340,22 +357,33 @@ export function FeedNav({ name }: { name: string }) {
                   </div>
                   <div className="_nav_profile_dropdown_info_txt">
                     <h4 className="_nav_dropdown_title">{name}</h4>
-                    <a href="#0" className="_nav_drop_profile">
+                    <button
+                      type="button"
+                      className="_nav_drop_profile _as_button"
+                    >
                       View Profile
-                    </a>
+                    </button>
                   </div>
                 </div>
                 <hr />
                 <ul className="_nav_dropdown_list">
                   <li className="_nav_dropdown_list_item">
-                    <a href="#0" className="_nav_dropdown_link">
+                    <button
+                      type="button"
+                      className="_nav_dropdown_link _as_button"
+                      style={{ width: "100%", textAlign: "left" }}
+                    >
                       <div className="_nav_drop_info">Settings</div>
-                    </a>
+                    </button>
                   </li>
                   <li className="_nav_dropdown_list_item">
-                    <a href="#0" className="_nav_dropdown_link">
+                    <button
+                      type="button"
+                      className="_nav_dropdown_link _as_button"
+                      style={{ width: "100%", textAlign: "left" }}
+                    >
                       <div className="_nav_drop_info">Help &amp; Support</div>
-                    </a>
+                    </button>
                   </li>
                   <li className="_nav_dropdown_list_item">
                     <button
@@ -372,7 +400,7 @@ export function FeedNav({ name }: { name: string }) {
                       }}
                     >
                       <div className="_nav_drop_info">
-                        {loggingOut ? "Logging out..." : "Log Out"}
+                        {loggingOut ? "Logging out…" : "Log Out"}
                       </div>
                     </button>
                   </li>
@@ -403,9 +431,9 @@ export function FeedNav({ name }: { name: string }) {
                     </div>
                     <div className="_header_mobile_menu_right">
                       <form className="_header_form_grp">
-                        <a
-                          href="#0"
-                          className="_header_mobile_search"
+                        <button
+                          type="button"
+                          className="_header_mobile_search _as_button"
                           aria-label="Search"
                         >
                           <svg
@@ -424,7 +452,7 @@ export function FeedNav({ name }: { name: string }) {
                             />
                           </svg>
                           <span className="visually-hidden">Search</span>
-                        </a>
+                        </button>
                       </form>
                     </div>
                   </div>
@@ -476,9 +504,9 @@ export function FeedNav({ name }: { name: string }) {
                     </a>
                   </li>
                   <li className="_mobile_navigation_bottom_item">
-                    <a
-                      href="#0"
-                      className="_mobile_navigation_bottom_link"
+                    <button
+                      type="button"
+                      className="_mobile_navigation_bottom_link _as_button"
                       aria-label="Friend requests"
                     >
                       <svg
@@ -499,10 +527,14 @@ export function FeedNav({ name }: { name: string }) {
                         />
                       </svg>
                       <span className="visually-hidden">Friend requests</span>
-                    </a>
+                    </button>
                   </li>
                   <li className="_mobile_navigation_bottom_item">
-                    <a href="#0" className="_mobile_navigation_bottom_link">
+                    <button
+                      type="button"
+                      className="_mobile_navigation_bottom_link _as_button"
+                      aria-label="Notifications (6 unread)"
+                    >
                       <svg
                         aria-hidden="true"
                         xmlns="http://www.w3.org/2000/svg"
@@ -520,11 +552,17 @@ export function FeedNav({ name }: { name: string }) {
                           clipRule="evenodd"
                         />
                       </svg>
-                      <span className="_counting">6</span>
-                    </a>
+                      <span aria-hidden="true" className="_counting">
+                        6
+                      </span>
+                    </button>
                   </li>
                   <li className="_mobile_navigation_bottom_item">
-                    <a href="#0" className="_mobile_navigation_bottom_link">
+                    <button
+                      type="button"
+                      className="_mobile_navigation_bottom_link _as_button"
+                      aria-label="Messages (2 unread)"
+                    >
                       <svg
                         aria-hidden="true"
                         xmlns="http://www.w3.org/2000/svg"
@@ -542,8 +580,10 @@ export function FeedNav({ name }: { name: string }) {
                           clipRule="evenodd"
                         />
                       </svg>
-                      <span className="_counting">2</span>
-                    </a>
+                      <span aria-hidden="true" className="_counting">
+                        2
+                      </span>
+                    </button>
                   </li>
                 </ul>
               </div>

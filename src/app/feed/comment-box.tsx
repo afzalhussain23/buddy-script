@@ -150,10 +150,18 @@ function ComposerFrame({
           </div>
         </div>
         <div className="_feed_inner_comment_box_icon">
-          <button type="button" className="_feed_inner_comment_box_icon_btn">
+          <button
+            type="button"
+            aria-label="Add emoji"
+            className="_feed_inner_comment_box_icon_btn"
+          >
             <SmileIcon />
           </button>
-          <button type="button" className="_feed_inner_comment_box_icon_btn">
+          <button
+            type="button"
+            aria-label="Attach file"
+            className="_feed_inner_comment_box_icon_btn"
+          >
             <AttachIcon />
           </button>
           <button
@@ -162,7 +170,7 @@ function ComposerFrame({
             disabled={isPending}
             style={{ fontSize: 13, fontWeight: 600 }}
           >
-            {isPending ? "Posting" : submitLabel}
+            {isPending ? "Posting…" : submitLabel}
           </button>
         </div>
       </form>

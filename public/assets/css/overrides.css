@@ -1,0 +1,45 @@
+/* Accessibility & motion fixes layered on top of the vendored Buddy Script
+   theme. Loaded after the theme stylesheets so these rules win the cascade
+   without editing the original theme files (keeps theme parity). */
+
+/* Restore a visible keyboard focus indicator. The theme zeroes outlines on
+   `button:focus-visible` / `input:focus-visible` (common.css) and with
+   `outline: none !important` across many controls (main.css), which leaves
+   keyboard users with no focus affordance anywhere. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+[tabindex]:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid #377dff !important;
+  outline-offset: 2px !important;
+  border-radius: 3px;
+}
+
+/* Placeholder nav/menu actions that have no destination yet are rendered as
+   <button> (not <a href="#0">) so keyboard/AT users don't land on dead links.
+   This strips the default button chrome while keeping the theme's link classes
+   for layout/colour. */
+button._as_button {
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+/* Honor a reduced-motion preference. The theme applies a blanket
+   `transition: .3s all ease` to every link and button; neutralize that plus
+   any other transitions/animations for users who ask for less motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

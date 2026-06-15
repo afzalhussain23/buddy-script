@@ -79,7 +79,7 @@ export function CreatePost({
           />
           {body ? null : (
             <label className="_feed_textarea_label" htmlFor="floatingTextarea">
-              Write something ...
+              Write something…
               <PencilIcon />
             </label>
           )}
@@ -168,7 +168,7 @@ export function CreatePost({
             disabled={isPending || (!body.trim() && !image)}
           >
             <SendIcon />
-            <span>{isPending ? "Posting..." : "Post"}</span>
+            <span>{isPending ? "Posting…" : "Post"}</span>
           </button>
         </div>
       </div>

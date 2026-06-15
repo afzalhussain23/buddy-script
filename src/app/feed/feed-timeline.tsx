@@ -69,7 +69,7 @@ export function FeedTimeline({
             disabled={isPending}
             className="_feed_inner_text_area_btn_link"
           >
-            <span>{isPending ? "Loading..." : "Load more"}</span>
+            <span>{isPending ? "Loading…" : "Load more"}</span>
           </button>
         </div>
       ) : null}

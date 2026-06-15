@@ -77,7 +77,9 @@ export function RegisterForm() {
             </label>
             <input
               id="registerFirstName"
+              name="firstName"
               type="text"
+              autoComplete="given-name"
               className="form-control _social_registration_input"
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
@@ -94,7 +96,9 @@ export function RegisterForm() {
             </label>
             <input
               id="registerLastName"
+              name="lastName"
               type="text"
+              autoComplete="family-name"
               className="form-control _social_registration_input"
               value={lastName}
               onChange={(e) => setLastName(e.target.value)}
@@ -111,7 +115,11 @@ export function RegisterForm() {
             </label>
             <input
               id="registerEmail"
+              name="email"
               type="email"
+              autoComplete="email"
+              autoCapitalize="none"
+              spellCheck={false}
               className="form-control _social_registration_input"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -128,7 +136,9 @@ export function RegisterForm() {
             </label>
             <input
               id="registerPassword"
+              name="password"
               type="password"
+              autoComplete="new-password"
               className="form-control _social_registration_input"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -145,7 +155,9 @@ export function RegisterForm() {
             </label>
             <input
               id="registerRepeatPassword"
+              name="repeatPassword"
               type="password"
+              autoComplete="new-password"
               className="form-control _social_registration_input"
               value={repeatPassword}
               onChange={(e) => setRepeatPassword(e.target.value)}
@@ -158,15 +170,15 @@ export function RegisterForm() {
           <div className="form-check _social_registration_form_check">
             <input
               className="form-check-input _social_registration_form_check_input"
-              type="radio"
-              name="flexRadioDefault"
-              id="flexRadioDefault2"
+              type="checkbox"
+              name="agreeTerms"
+              id="agreeTerms"
               checked={agreed}
               onChange={(e) => setAgreed(e.target.checked)}
             />
             <label
               className="form-check-label _social_registration_form_check_label"
-              htmlFor="flexRadioDefault2"
+              htmlFor="agreeTerms"
             >
               I agree to terms & conditions
             </label>
@@ -177,6 +189,7 @@ export function RegisterForm() {
         <div className="row">
           <div className="col-lg-12 col-xl-12 col-md-12 col-sm-12">
             <p
+              role="alert"
               className="_social_registration_content_para"
               style={{ color: "#ff4d4f", marginTop: "10px" }}
             >
@@ -193,7 +206,7 @@ export function RegisterForm() {
               className="_social_registration_form_btn_link _btn1"
               disabled={loading}
             >
-              {loading ? "Creating account..." : "Sign up"}
+              {loading ? "Creating account…" : "Sign up"}
             </button>
           </div>
         </div>

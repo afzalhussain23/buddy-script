@@ -29,6 +29,17 @@ export const PostCard = memo(function PostCard({
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const commentAreaRef = useRef<HTMLDivElement>(null);
+
+  // The "Comment" action button just focuses the post's own comment composer
+  // (the main textarea is the direct child composer, not a reply composer).
+  function focusComposer() {
+    commentAreaRef.current
+      ?.querySelector<HTMLTextAreaElement>(
+        ":scope > ._feed_inner_comment_box textarea",
+      )
+      ?.focus();
+  }
 
   const [liked, setLiked] = useState(post.likedByMe);
   const [likeCount, setLikeCount] = useState(post.likeCount);
@@ -103,7 +114,7 @@ export const PostCard = memo(function PostCard({
     });
   }
 
-  // Close the post's "..." menu on an outside click.
+  // Close the post's "..." menu on an outside click or the Escape key.
   useEffect(() => {
     if (!menuOpen) return;
 
@@ -112,8 +123,15 @@ export const PostCard = memo(function PostCard({
         setMenuOpen(false);
       }
     }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setMenuOpen(false);
+    }
     document.addEventListener("mousedown", onClick);
-    return () => document.removeEventListener("mousedown", onClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onClick);
+      document.removeEventListener("keydown", onKey);
+    };
   }, [menuOpen]);
 
   return (
@@ -144,6 +162,9 @@ export const PostCard = memo(function PostCard({
               <button
                 type="button"
                 onClick={() => setMenuOpen((v) => !v)}
+                aria-label="Post options"
+                aria-haspopup="true"
+                aria-expanded={menuOpen}
                 className="_feed_timeline_post_dropdown_link"
               >
                 <ThreeDotsIcon />
@@ -155,17 +176,27 @@ export const PostCard = memo(function PostCard({
               <ul className="_feed_timeline_dropdown_list">
                 {postMenuItems.map((item) => (
                   <li key={item.label} className="_feed_timeline_dropdown_item">
-                    <a href="#0" className="_feed_timeline_dropdown_link">
+                    <button
+                      type="button"
+                      className="_feed_timeline_dropdown_link"
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        cursor: "pointer",
+                        textAlign: "left",
+                        width: "100%",
+                      }}
+                    >
                       <span>{item.icon}</span>
                       {item.label}
-                    </a>
+                    </button>
                   </li>
                 ))}
               </ul>
             </div>
           </div>
         </div>
-        <h4 className="_feed_inner_timeline_post_title">{post.body}</h4>
+        <p className="_feed_inner_timeline_post_title">{post.body}</p>
         {post.imageUrl ? (
           <div className="_feed_inner_timeline_image">
             {post.imageWidth && post.imageHeight ? (
@@ -251,6 +282,7 @@ export const PostCard = memo(function PostCard({
         </button>
         <button
           type="button"
+          onClick={focusComposer}
           className="_feed_inner_timeline_reaction_comment _feed_reaction"
         >
           <span className="_feed_inner_timeline_reaction_link">
@@ -277,7 +309,7 @@ export const PostCard = memo(function PostCard({
         </button>
       </div>
 
-      <div className="_feed_inner_timeline_cooment_area">
+      <div className="_feed_inner_timeline_cooment_area" ref={commentAreaRef}>
         {loadedComments.map((comment) => (
           <CommentRow
             key={comment.id}
@@ -301,7 +333,7 @@ export const PostCard = memo(function PostCard({
               padding: "6px 0",
             }}
           >
-            {isLoadingComments ? "Loading comments..." : "Load more comments"}
+            {isLoadingComments ? "Loading comments…" : "Load more comments"}
           </button>
         ) : null}
         {commentLoadError ? (
@@ -532,7 +564,7 @@ function CommentRow({
               padding: "6px 0",
             }}
           >
-            {isLoadingReplies ? "Loading replies..." : "Load more replies"}
+            {isLoadingReplies ? "Loading replies…" : "Load more replies"}
           </button>
         ) : null}
         {replyLoadError ? (

@@ -1,17 +1,42 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+
+const STORAGE_KEY = "buddyscript:theme";
 
 // Toggles the theme's `_dark_wrapper` class on the page wrapper, matching the
-// switch in the original custom.js.
+// switch in the original custom.js. The choice is persisted and the document's
+// `color-scheme` is kept in sync so form controls and scrollbars match.
 export function DarkModeToggle() {
   const [dark, setDark] = useState(false);
+
+  function applyDark(next: boolean) {
+    document
+      .querySelector("._layout_main_wrapper")
+      ?.classList.toggle("_dark_wrapper", next);
+    document.documentElement.style.colorScheme = next ? "dark" : "light";
+  }
+
+  // Restore the saved preference (falling back to the OS setting) after
+  // hydration, so server and client render the same initial markup.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: run once on mount.
+  useEffect(() => {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    const prefersDark =
+      stored === "dark" ||
+      (stored === null &&
+        window.matchMedia("(prefers-color-scheme: dark)").matches);
+    if (prefersDark) {
+      applyDark(true);
+      setDark(true);
+    }
+  }, []);
 
   function toggle() {
     const next = !dark;
     setDark(next);
-    const wrapper = document.querySelector("._layout_main_wrapper");
-    wrapper?.classList.toggle("_dark_wrapper", next);
+    applyDark(next);
+    localStorage.setItem(STORAGE_KEY, next ? "dark" : "light");
   }
 
   return (
@@ -19,6 +44,8 @@ export function DarkModeToggle() {
       <button
         type="button"
         onClick={toggle}
+        aria-label="Toggle dark mode"
+        aria-pressed={dark}
         className="_layout_swithing_btn_link"
       >
         <div className="_layout_swithing_btn">

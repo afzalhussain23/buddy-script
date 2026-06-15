@@ -469,7 +469,7 @@ function TimelineSkeleton() {
   return (
     <div className="_feed_inner_timeline_post_area _b_radious6 _padd_b24 _padd_t24 _padd_r24 _padd_l24 _mar_b16">
       <p className="_feed_inner_timeline_post_box_para" style={{ margin: 0 }}>
-        Loading feed...
+        Loading feed…
       </p>
     </div>
   );

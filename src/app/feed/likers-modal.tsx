@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { Avatar } from "@/components/avatar";
 import { loadLikers } from "./actions";
@@ -30,6 +30,7 @@ export function LikersModal({
   const [isPending, startFetch] = useTransition();
   const [mounted, setMounted] = useState(false);
   const [dark, setDark] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   function fetchPage(after: LikerCursor | null) {
     setError(null);
@@ -75,6 +76,38 @@ export function LikersModal({
     };
   }, [onClose]);
 
+  // Move focus into the dialog on open, trap Tab within it, and restore focus
+  // to the triggering element on close.
+  useEffect(() => {
+    if (!mounted) return;
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    dialogRef.current?.focus();
+
+    function onTab(e: KeyboardEvent) {
+      if (e.key !== "Tab" || !dialogRef.current) return;
+      const focusables = dialogRef.current.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])',
+      );
+      if (focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      const active = document.activeElement;
+      if (e.shiftKey && (active === first || active === dialogRef.current)) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+
+    document.addEventListener("keydown", onTab);
+    return () => {
+      document.removeEventListener("keydown", onTab);
+      previouslyFocused?.focus?.();
+    };
+  }, [mounted]);
+
   if (!mounted) return null;
 
   const surface = dark ? "#112032" : "#ffffff";
@@ -109,9 +142,11 @@ export function LikersModal({
         }}
       />
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label="People who liked this"
+        tabIndex={-1}
         style={{
           position: "relative",
           zIndex: 1,

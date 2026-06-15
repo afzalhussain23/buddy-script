@@ -50,7 +50,11 @@ export function LoginForm() {
             </label>
             <input
               id="loginEmail"
+              name="email"
               type="email"
+              autoComplete="email"
+              autoCapitalize="none"
+              spellCheck={false}
               className="form-control _social_login_input"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -67,7 +71,9 @@ export function LoginForm() {
             </label>
             <input
               id="loginPassword"
+              name="password"
               type="password"
+              autoComplete="current-password"
               className="form-control _social_login_input"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -80,14 +86,14 @@ export function LoginForm() {
           <div className="form-check _social_login_form_check">
             <input
               className="form-check-input _social_login_form_check_input"
-              type="radio"
-              name="flexRadioDefault"
-              id="flexRadioDefault2"
+              type="checkbox"
+              name="rememberMe"
+              id="rememberMe"
               defaultChecked
             />
             <label
               className="form-check-label _social_login_form_check_label"
-              htmlFor="flexRadioDefault2"
+              htmlFor="rememberMe"
             >
               Remember me
             </label>
@@ -95,7 +101,18 @@ export function LoginForm() {
         </div>
         <div className="col-lg-6 col-xl-6 col-md-6 col-sm-12">
           <div className="_social_login_form_left">
-            <p className="_social_login_form_left_para">Forgot password?</p>
+            <button
+              type="button"
+              className="_social_login_form_left_para"
+              style={{
+                background: "transparent",
+                border: "none",
+                cursor: "pointer",
+                padding: 0,
+              }}
+            >
+              Forgot password?
+            </button>
           </div>
         </div>
       </div>
@@ -103,6 +120,7 @@ export function LoginForm() {
         <div className="row">
           <div className="col-lg-12 col-md-12 col-xl-12 col-sm-12">
             <p
+              role="alert"
               className="_social_login_form_left_para"
               style={{ color: "#ff4d4f", marginTop: "10px" }}
             >
@@ -119,7 +137,7 @@ export function LoginForm() {
               className="_social_login_form_btn_link _btn1"
               disabled={loading}
             >
-              {loading ? "Logging in..." : "Login now"}
+              {loading ? "Logging in…" : "Login now"}
             </button>
           </div>
         </div>
