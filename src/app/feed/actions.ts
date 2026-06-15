@@ -29,9 +29,13 @@ import {
   type FeedCursor,
   type FeedPage,
   type FeedPost,
+  getCommentLikersPage,
   getCommentsPage,
   getFeedPage,
+  getPostLikersPage,
   getRepliesPage,
+  type LikerCursor,
+  type LikersPage,
   type ReplyPage,
 } from "./queries";
 
@@ -601,4 +605,53 @@ export async function loadMoreReplies(input: {
       input.cursor,
     ),
   };
+}
+
+type LoadLikersResult =
+  | { ok: true; page: LikersPage }
+  | { ok: false; error: string };
+
+// Lazily fetch the likers of a post, comment, or reply for the "who liked this"
+// modal. Visibility is enforced in the query (the same rule the feed uses), so
+// this only checks the viewer is signed in and the input is well-formed.
+export async function loadLikers(input: {
+  targetType: "post" | "comment";
+  targetId: string;
+  cursor: LikerCursor | null;
+}): Promise<LoadLikersResult> {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session) return { ok: false, error: "Authentication required." };
+
+  if (
+    !input ||
+    (input.targetType !== "post" && input.targetType !== "comment") ||
+    typeof input.targetId !== "string"
+  ) {
+    return { ok: false, error: "Invalid request." };
+  }
+
+  const { cursor } = input;
+  if (
+    cursor !== null &&
+    (typeof cursor !== "object" ||
+      typeof cursor.createdAt !== "string" ||
+      typeof cursor.userId !== "string")
+  ) {
+    return { ok: false, error: "Invalid cursor." };
+  }
+
+  const page =
+    input.targetType === "post"
+      ? await getPostLikersPage(
+          session.user.id,
+          input.targetId,
+          cursor ?? undefined,
+        )
+      : await getCommentLikersPage(
+          session.user.id,
+          input.targetId,
+          cursor ?? undefined,
+        );
+
+  return { ok: true, page };
 }

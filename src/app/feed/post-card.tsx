@@ -10,12 +10,12 @@ import {
 import { CommentBox } from "./comment-box";
 import {
   CommentIcon,
-  HahaEmoji,
   postMenuItems,
   ShareIcon,
   ThreeDotsIcon,
   ThumbsUpIcon,
 } from "./feed-icons";
+import { LikersModal } from "./likers-modal";
 import type { FeedComment, FeedPost } from "./queries";
 
 // Fallback avatar (user images aren't uploaded yet — see auth.user.image).
@@ -34,6 +34,7 @@ export function PostCard({ post }: { post: FeedPost }) {
     post.nextCommentCursor,
   );
   const [commentLoadError, setCommentLoadError] = useState<string | null>(null);
+  const [likersOpen, setLikersOpen] = useState(false);
   const [isLiking, startLike] = useTransition();
   const [isLoadingComments, startLoadComments] = useTransition();
 
@@ -167,9 +168,30 @@ export function PostCard({ post }: { post: FeedPost }) {
       </div>
 
       <div className="_feed_inner_timeline_total_reacts _padd_r24 _padd_l24 _mar_b26">
-        <div className="_feed_inner_timeline_total_reacts_image">
+        <button
+          type="button"
+          onClick={() => likeCount > 0 && setLikersOpen(true)}
+          disabled={likeCount === 0}
+          aria-haspopup="dialog"
+          aria-label={`See who liked this post (${likeCount})`}
+          className="_feed_inner_timeline_total_reacts_image"
+          style={{
+            background: "transparent",
+            border: "none",
+            cursor: likeCount > 0 ? "pointer" : "default",
+            padding: 0,
+          }}
+        >
           <p className="_feed_inner_timeline_total_reacts_para">{likeCount}</p>
-        </div>
+        </button>
+        {likersOpen ? (
+          <LikersModal
+            targetType="post"
+            targetId={post.id}
+            count={likeCount}
+            onClose={() => setLikersOpen(false)}
+          />
+        ) : null}
         <div className="_feed_inner_timeline_total_reacts_txt">
           <p className="_feed_inner_timeline_total_reacts_para1">
             <span>{commentCount}</span>{" "}
@@ -187,8 +209,10 @@ export function PostCard({ post }: { post: FeedPost }) {
           className={`_feed_inner_timeline_reaction_emoji _feed_reaction${liked ? " _feed_reaction_active" : ""}`}
         >
           <span className="_feed_inner_timeline_reaction_link">
-            <span>
-              <HahaEmoji />
+            <span
+              style={{ alignItems: "center", display: "inline-flex", gap: 8 }}
+            >
+              <ThumbsUpIcon />
               {liked ? "Liked" : "Like"}
             </span>
           </span>
@@ -198,7 +222,9 @@ export function PostCard({ post }: { post: FeedPost }) {
           className="_feed_inner_timeline_reaction_comment _feed_reaction"
         >
           <span className="_feed_inner_timeline_reaction_link">
-            <span>
+            <span
+              style={{ alignItems: "center", display: "inline-flex", gap: 8 }}
+            >
               <CommentIcon />
               Comment
             </span>
@@ -209,7 +235,9 @@ export function PostCard({ post }: { post: FeedPost }) {
           className="_feed_inner_timeline_reaction_share _feed_reaction"
         >
           <span className="_feed_inner_timeline_reaction_link">
-            <span>
+            <span
+              style={{ alignItems: "center", display: "inline-flex", gap: 8 }}
+            >
               <ShareIcon />
               Share
             </span>
@@ -275,6 +303,7 @@ export function PostCard({ post }: { post: FeedPost }) {
 function CommentLikeButton({ comment }: { comment: FeedComment }) {
   const [liked, setLiked] = useState(comment.likedByMe);
   const [likeCount, setLikeCount] = useState(comment.likeCount);
+  const [likersOpen, setLikersOpen] = useState(false);
   const [isLiking, startLike] = useTransition();
 
   function handleToggleLike() {
@@ -306,26 +335,52 @@ function CommentLikeButton({ comment }: { comment: FeedComment }) {
   }
 
   return (
-    <button
-      type="button"
-      onClick={handleToggleLike}
-      disabled={isLiking}
-      aria-pressed={liked}
-      className="_feed_inner_comment_box_icon_btn"
-      style={{
-        alignItems: "center",
-        color: liked ? "#377dff" : undefined,
-        display: "inline-flex",
-        fontSize: 13,
-        fontWeight: 600,
-        gap: 5,
-        padding: 0,
-      }}
-    >
-      <ThumbsUpIcon />
-      {liked ? "Liked" : "Like"}
-      {likeCount > 0 ? ` · ${likeCount}` : ""}
-    </button>
+    <>
+      <button
+        type="button"
+        onClick={handleToggleLike}
+        disabled={isLiking}
+        aria-pressed={liked}
+        className="_feed_inner_comment_box_icon_btn"
+        style={{
+          alignItems: "center",
+          color: liked ? "#377dff" : undefined,
+          display: "inline-flex",
+          fontSize: 13,
+          fontWeight: 600,
+          gap: 5,
+          padding: 0,
+        }}
+      >
+        <ThumbsUpIcon />
+        {liked ? "Liked" : "Like"}
+      </button>
+      {likeCount > 0 ? (
+        <button
+          type="button"
+          onClick={() => setLikersOpen(true)}
+          aria-haspopup="dialog"
+          aria-label={`See who liked this (${likeCount})`}
+          className="_feed_inner_comment_box_icon_btn"
+          style={{
+            color: "#377dff",
+            fontSize: 13,
+            fontWeight: 600,
+            padding: 0,
+          }}
+        >
+          {likeCount}
+        </button>
+      ) : null}
+      {likersOpen ? (
+        <LikersModal
+          targetType="comment"
+          targetId={comment.id}
+          count={likeCount}
+          onClose={() => setLikersOpen(false)}
+        />
+      ) : null}
+    </>
   );
 }
 

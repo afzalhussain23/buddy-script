@@ -19,6 +19,7 @@ import { formatRelativeTime } from "@/lib/relative-time";
 export const FEED_PAGE_SIZE = 20;
 export const COMMENT_PAGE_SIZE = 10;
 export const REPLY_PAGE_SIZE = 5;
+export const LIKERS_PAGE_SIZE = 50;
 
 // Keyset (not OFFSET) cursor: the created_at + id of the last row returned. The
 // feed orders by created_at DESC, so id alone isn't a sufficient keyset — id is
@@ -27,6 +28,22 @@ export const REPLY_PAGE_SIZE = 5;
 // precision so the value round-trips exactly (see posts.createdAt).
 export type FeedCursor = { createdAt: string; id: string };
 export type CommentCursor = { createdAt: string; id: string };
+// Likers are keyed on the like row's (created_at, user_id): created_at is the
+// "newest first" sort, user_id the tiebreaker for likes sharing a timestamp.
+// created_at is serialized via to_char at microsecond precision and re-parsed
+// with ::timestamp (not a JS Date, which truncates to ms) so the keyset is exact.
+export type LikerCursor = { createdAt: string; userId: string };
+
+export type Liker = {
+  userId: string;
+  name: string;
+  image: string | null;
+};
+
+export type LikersPage = {
+  likers: Liker[];
+  nextCursor: LikerCursor | null;
+};
 
 export type FeedComment = {
   id: string;
@@ -477,5 +494,126 @@ export async function getRepliesPage(
     replies: page.map(toFeedComment),
     nextCursor:
       hasMore && last ? { createdAt: last.createdAtCursor, id: last.id } : null,
+  };
+}
+
+// Who liked a post, newest first, keyset-paginated. The inner join to `user`
+// (likes cascade-delete with the user, so the row always resolves) yields the
+// liker's full name. The EXISTS guard repeats the feed's visibility rule so a
+// viewer can't enumerate likers of a hidden post by id.
+export async function getPostLikersPage(
+  viewerId: string,
+  postId: string,
+  cursor?: LikerCursor,
+): Promise<LikersPage> {
+  const conditions: SQL[] = [
+    eq(postLikes.postId, postId),
+    sql`exists (
+      select 1 from ${posts}
+      where ${posts.id} = ${postId}
+        and ${posts.deletedAt} is null
+        and (${posts.isPrivate} = false or ${posts.authorId} = ${viewerId})
+    )`,
+  ];
+
+  if (cursor) {
+    conditions.push(
+      or(
+        sql`${postLikes.createdAt} < ${cursor.createdAt}::timestamp`,
+        and(
+          sql`${postLikes.createdAt} = ${cursor.createdAt}::timestamp`,
+          sql`${postLikes.userId} < ${cursor.userId}`,
+        ),
+      ) as SQL,
+    );
+  }
+
+  const rows = await db
+    .select({
+      userId: postLikes.userId,
+      name: user.name,
+      image: user.image,
+      createdAtCursor: sql<string>`to_char(${postLikes.createdAt}, 'YYYY-MM-DD"T"HH24:MI:SS.US')`,
+    })
+    .from(postLikes)
+    .innerJoin(user, eq(postLikes.userId, user.id))
+    .where(and(...conditions))
+    .orderBy(desc(postLikes.createdAt), desc(postLikes.userId))
+    .limit(LIKERS_PAGE_SIZE + 1);
+
+  return toLikersPage(rows);
+}
+
+// Who liked a comment or reply (both live in `comments`), newest first. Mirrors
+// getPostLikersPage; the EXISTS guard requires the comment to be live and its
+// post visible to the viewer.
+export async function getCommentLikersPage(
+  viewerId: string,
+  commentId: string,
+  cursor?: LikerCursor,
+): Promise<LikersPage> {
+  const conditions: SQL[] = [
+    eq(commentLikes.commentId, commentId),
+    sql`exists (
+      select 1 from ${comments}
+      inner join ${posts} on ${posts.id} = ${comments.postId}
+      where ${comments.id} = ${commentId}
+        and ${comments.deletedAt} is null
+        and ${posts.deletedAt} is null
+        and (${posts.isPrivate} = false or ${posts.authorId} = ${viewerId})
+    )`,
+  ];
+
+  if (cursor) {
+    conditions.push(
+      or(
+        sql`${commentLikes.createdAt} < ${cursor.createdAt}::timestamp`,
+        and(
+          sql`${commentLikes.createdAt} = ${cursor.createdAt}::timestamp`,
+          sql`${commentLikes.userId} < ${cursor.userId}`,
+        ),
+      ) as SQL,
+    );
+  }
+
+  const rows = await db
+    .select({
+      userId: commentLikes.userId,
+      name: user.name,
+      image: user.image,
+      createdAtCursor: sql<string>`to_char(${commentLikes.createdAt}, 'YYYY-MM-DD"T"HH24:MI:SS.US')`,
+    })
+    .from(commentLikes)
+    .innerJoin(user, eq(commentLikes.userId, user.id))
+    .where(and(...conditions))
+    .orderBy(desc(commentLikes.createdAt), desc(commentLikes.userId))
+    .limit(LIKERS_PAGE_SIZE + 1);
+
+  return toLikersPage(rows);
+}
+
+// Shared tail for the two liker queries: peel the +1 lookahead row into a
+// nextCursor and shape the rest into `Liker`s.
+function toLikersPage(
+  rows: {
+    userId: string;
+    name: string;
+    image: string | null;
+    createdAtCursor: string;
+  }[],
+): LikersPage {
+  const hasMore = rows.length > LIKERS_PAGE_SIZE;
+  const page = hasMore ? rows.slice(0, LIKERS_PAGE_SIZE) : rows;
+  const last = page.at(-1);
+  return {
+    likers: page.map((row) => ({
+      userId: row.userId,
+      name: row.name,
+      image: row.image,
+    })),
+    nextCursor:
+      hasMore && last
+        ? { createdAt: last.createdAtCursor, userId: last.userId }
+        : null,
   };
 }
