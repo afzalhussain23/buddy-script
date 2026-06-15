@@ -5,6 +5,8 @@ A Next.js social feed app. Users register, sign in, and view a protected feed of
 ## Conventions
 - Use **pnpm** for all dependency management (never npm/yarn).
 - Use `fd` instead of `find` and `rg` instead of `grep`.
+- Don't write obvious comments that restate what the code does; only comment on non-obvious intent or rationale.
+- Match the existing commit message style (`git log`): terse, imperative subject line with an optional short body.
 
 ## Tooling
 - **agent-browser skill**: use for any browser automation — navigating pages, filling forms, clicking, screenshots, scraping, and exploratory/QA testing of the app. Prefer it over other built-in browser/web tools.
