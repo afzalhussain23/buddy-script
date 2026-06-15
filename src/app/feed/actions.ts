@@ -64,6 +64,15 @@ function validationFailure(error: ZodError, fallback: string): ActionFailure {
   };
 }
 
+// Funnel unexpected (non-validation, non-business-rule) failures through one
+// place: log the full detail server-side and hand the client a generic message.
+// Keeps these actions consistent with the { ok: false } contract instead of
+// rejecting, which would otherwise surface as an opaque framework error.
+function unexpectedFailure(context: string, error: unknown): ActionFailure {
+  console.error(context, error);
+  return { ok: false, error: "Something went wrong. Please try again." };
+}
+
 type CreatePostResult = { ok: true; post: FeedPost } | ActionFailure;
 const POST_LIMIT = 20;
 const POST_LIMIT_WINDOW_MS = 10 * 60 * 1000;
@@ -81,7 +90,7 @@ function toFeedPost(
     authorName: author.name,
     authorImage: author.image ?? null,
     body: row.body,
-    imageUrl: row.imageUrl,
+    imageUrl: row.imageObjectKey ? `/api/posts/${row.id}/image` : null,
     imageWidth: row.imageWidth,
     imageHeight: row.imageHeight,
     isPrivate: row.isPrivate,
@@ -115,26 +124,36 @@ export async function createPost(input: unknown): Promise<CreatePostResult> {
   }
 
   if (!uploadId) {
-    const [row] = await db
-      .insert(posts)
-      .values({ authorId: session.user.id, body })
-      .returning();
+    let row: typeof posts.$inferSelect;
+    try {
+      [row] = await db
+        .insert(posts)
+        .values({ authorId: session.user.id, body })
+        .returning();
+    } catch (error) {
+      return unexpectedFailure("Failed to create post", error);
+    }
     revalidatePath("/feed");
     return { ok: true, post: toFeedPost(row, session.user) };
   }
 
-  const [upload] = await db
-    .update(imageUploads)
-    .set({ status: "processing" })
-    .where(
-      and(
-        eq(imageUploads.id, uploadId),
-        eq(imageUploads.userId, session.user.id),
-        eq(imageUploads.status, "pending"),
-        gt(imageUploads.expiresAt, new Date()),
-      ),
-    )
-    .returning();
+  let upload: typeof imageUploads.$inferSelect | undefined;
+  try {
+    [upload] = await db
+      .update(imageUploads)
+      .set({ status: "processing" })
+      .where(
+        and(
+          eq(imageUploads.id, uploadId),
+          eq(imageUploads.userId, session.user.id),
+          eq(imageUploads.status, "pending"),
+          gt(imageUploads.expiresAt, new Date()),
+        ),
+      )
+      .returning();
+  } catch (error) {
+    return unexpectedFailure("Failed to claim image upload", error);
+  }
 
   if (!upload) {
     return { ok: false, error: "This image upload is invalid or expired." };
@@ -150,7 +169,10 @@ export async function createPost(input: unknown): Promise<CreatePostResult> {
         status:
           error instanceof R2UploadVerificationError ? "rejected" : "pending",
       })
-      .where(eq(imageUploads.id, upload.id));
+      .where(eq(imageUploads.id, upload.id))
+      .catch((updateError) => {
+        console.error("Failed to reset image upload status", updateError);
+      });
 
     if (error instanceof R2ConfigurationError) {
       return { ok: false, error: error.message };
@@ -172,7 +194,7 @@ export async function createPost(input: unknown): Promise<CreatePostResult> {
           id: postId,
           authorId: session.user.id,
           body,
-          imageUrl: upload.publicUrl,
+          imageObjectKey: upload.publishedObjectKey,
           imageWidth: imageDimensions.width,
           imageHeight: imageDimensions.height,
         })
@@ -232,8 +254,10 @@ export async function toggleLike(input: unknown): Promise<ToggleLikeResult> {
   const userId = session.user.id;
   const { postId, liked } = parsed.data;
 
-  const result = liked
-    ? await db.execute<{ like_count: number }>(sql`
+  let result: Awaited<ReturnType<typeof db.execute<{ like_count: number }>>>;
+  try {
+    result = liked
+      ? await db.execute<{ like_count: number }>(sql`
         with target as (
           select 1 from ${posts}
           where ${posts.id} = ${postId}
@@ -253,7 +277,7 @@ export async function toggleLike(input: unknown): Promise<ToggleLikeResult> {
           and (${posts.isPrivate} = false or ${posts.authorId} = ${userId})
         returning like_count
       `)
-    : await db.execute<{ like_count: number }>(sql`
+      : await db.execute<{ like_count: number }>(sql`
         with del as (
           delete from ${postLikes}
           where ${postLikes.userId} = ${userId}
@@ -273,6 +297,9 @@ export async function toggleLike(input: unknown): Promise<ToggleLikeResult> {
           and (${posts.isPrivate} = false or ${posts.authorId} = ${userId})
         returning like_count
       `);
+  } catch (error) {
+    return unexpectedFailure("Failed to toggle post like", error);
+  }
 
   const row = result.rows[0];
   if (!row) {
@@ -300,8 +327,10 @@ export async function toggleCommentLike(
   const userId = session.user.id;
   const { commentId, liked } = parsed.data;
 
-  const result = liked
-    ? await db.execute<{ like_count: number }>(sql`
+  let result: Awaited<ReturnType<typeof db.execute<{ like_count: number }>>>;
+  try {
+    result = liked
+      ? await db.execute<{ like_count: number }>(sql`
         with target as (
           select 1 from ${comments}
           inner join ${posts} on ${posts.id} = ${comments.postId}
@@ -322,7 +351,7 @@ export async function toggleCommentLike(
           and exists (select 1 from target)
         returning like_count
       `)
-    : await db.execute<{ like_count: number }>(sql`
+      : await db.execute<{ like_count: number }>(sql`
         with target as (
           select 1 from ${comments}
           inner join ${posts} on ${posts.id} = ${comments.postId}
@@ -344,6 +373,9 @@ export async function toggleCommentLike(
           and exists (select 1 from target)
         returning like_count
       `);
+  } catch (error) {
+    return unexpectedFailure("Failed to toggle comment like", error);
+  }
 
   const row = result.rows[0];
   if (!row) {
@@ -381,13 +413,25 @@ export async function createComment(
   }
 
   const commentId = uuidv7();
-  const result = await db.execute<{
-    id: string;
-    post_id: string;
-    body: string;
-    created_at: string | Date;
-    comment_count: number;
-  }>(sql`
+  let result: Awaited<
+    ReturnType<
+      typeof db.execute<{
+        id: string;
+        post_id: string;
+        body: string;
+        created_at: string | Date;
+        comment_count: number;
+      }>
+    >
+  >;
+  try {
+    result = await db.execute<{
+      id: string;
+      post_id: string;
+      body: string;
+      created_at: string | Date;
+      comment_count: number;
+    }>(sql`
     with target as (
       select ${posts.id} from ${posts}
       where ${posts.id} = ${postId}
@@ -412,6 +456,9 @@ export async function createComment(
       updated.comment_count
     from inserted cross join updated
   `);
+  } catch (error) {
+    return unexpectedFailure("Failed to create comment", error);
+  }
 
   const row = result.rows[0];
   if (!row) {
@@ -462,14 +509,27 @@ export async function createReply(
   }
 
   const replyId = uuidv7();
-  const result = await db.execute<{
-    id: string;
-    post_id: string;
-    parent_id: string;
-    body: string;
-    created_at: string | Date;
-    comment_count: number;
-  }>(sql`
+  let result: Awaited<
+    ReturnType<
+      typeof db.execute<{
+        id: string;
+        post_id: string;
+        parent_id: string;
+        body: string;
+        created_at: string | Date;
+        comment_count: number;
+      }>
+    >
+  >;
+  try {
+    result = await db.execute<{
+      id: string;
+      post_id: string;
+      parent_id: string;
+      body: string;
+      created_at: string | Date;
+      comment_count: number;
+    }>(sql`
     with target as (
       select ${comments.id}, ${comments.postId}
       from ${comments}
@@ -501,6 +561,9 @@ export async function createReply(
       updated.comment_count
     from inserted cross join updated
   `);
+  } catch (error) {
+    return unexpectedFailure("Failed to create reply", error);
+  }
 
   const row = result.rows[0];
   if (!row) {
@@ -540,7 +603,11 @@ export async function loadMorePosts(
     return validationFailure(parsed.error, "Invalid feed cursor.");
   }
 
-  return { ok: true, page: await getFeedPage(session.user.id, parsed.data) };
+  try {
+    return { ok: true, page: await getFeedPage(session.user.id, parsed.data) };
+  } catch (error) {
+    return unexpectedFailure("Failed to load more posts", error);
+  }
 }
 
 type LoadMoreCommentsResult = { ok: true; page: CommentPage } | ActionFailure;
@@ -556,14 +623,18 @@ export async function loadMoreComments(
     return validationFailure(parsed.error, "Invalid comment cursor.");
   }
 
-  return {
-    ok: true,
-    page: await getCommentsPage(
-      session.user.id,
-      parsed.data.postId,
-      parsed.data.cursor,
-    ),
-  };
+  try {
+    return {
+      ok: true,
+      page: await getCommentsPage(
+        session.user.id,
+        parsed.data.postId,
+        parsed.data.cursor,
+      ),
+    };
+  } catch (error) {
+    return unexpectedFailure("Failed to load more comments", error);
+  }
 }
 
 type LoadMoreRepliesResult = { ok: true; page: ReplyPage } | ActionFailure;
@@ -579,15 +650,19 @@ export async function loadMoreReplies(
     return validationFailure(parsed.error, "Invalid reply cursor.");
   }
 
-  return {
-    ok: true,
-    page: await getRepliesPage(
-      session.user.id,
-      parsed.data.postId,
-      parsed.data.parentId,
-      parsed.data.cursor,
-    ),
-  };
+  try {
+    return {
+      ok: true,
+      page: await getRepliesPage(
+        session.user.id,
+        parsed.data.postId,
+        parsed.data.parentId,
+        parsed.data.cursor,
+      ),
+    };
+  } catch (error) {
+    return unexpectedFailure("Failed to load more replies", error);
+  }
 }
 
 type LoadLikersResult = { ok: true; page: LikersPage } | ActionFailure;
@@ -605,14 +680,22 @@ export async function loadLikers(input: unknown): Promise<LoadLikersResult> {
   }
   const { targetType, targetId, cursor } = parsed.data;
 
-  const page =
-    targetType === "post"
-      ? await getPostLikersPage(session.user.id, targetId, cursor ?? undefined)
-      : await getCommentLikersPage(
-          session.user.id,
-          targetId,
-          cursor ?? undefined,
-        );
+  try {
+    const page =
+      targetType === "post"
+        ? await getPostLikersPage(
+            session.user.id,
+            targetId,
+            cursor ?? undefined,
+          )
+        : await getCommentLikersPage(
+            session.user.id,
+            targetId,
+            cursor ?? undefined,
+          );
 
-  return { ok: true, page };
+    return { ok: true, page };
+  } catch (error) {
+    return unexpectedFailure("Failed to load likers", error);
+  }
 }
