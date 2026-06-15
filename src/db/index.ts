@@ -4,7 +4,12 @@ import * as authSchema from "./auth";
 import * as socialSchema from "./social";
 
 const schema = { ...authSchema, ...socialSchema };
+const databaseUrl = process.env.DATABASE_URL?.trim();
 
-const sql = neon(process.env.DATABASE_URL!);
+if (!databaseUrl) {
+  throw new Error("DATABASE_URL is not configured");
+}
+
+const sql = neon(databaseUrl);
 
 export const db = drizzle({ client: sql, schema });
