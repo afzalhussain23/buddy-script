@@ -1,0 +1,1 @@
+ALTER TABLE "image_uploads" ADD CONSTRAINT "image_uploads_attached_post_id_posts_id_fk" FOREIGN KEY ("attached_post_id") REFERENCES "public"."posts"("id") ON DELETE set null ON UPDATE no action;

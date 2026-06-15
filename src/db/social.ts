@@ -72,7 +72,9 @@ export const imageUploads = pgTable(
     contentType: text("content_type").notNull(),
     expectedSize: integer("expected_size").notNull(),
     status: text("status").default("pending").notNull(),
-    attachedPostId: uuid("attached_post_id").unique(),
+    attachedPostId: uuid("attached_post_id")
+      .unique()
+      .references(() => posts.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     expiresAt: timestamp("expires_at").notNull(),
     verifiedAt: timestamp("verified_at"),
