@@ -22,6 +22,9 @@ export function CreatePost({
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [isPending, startTransition] = useTransition();
+  const hasPostText = body.trim().length > 0;
+  const hasImage = image !== null;
+  const canSubmitPost = hasPostText || hasImage;
 
   function chooseImage(file: File | undefined) {
     setError(null);
@@ -36,6 +39,8 @@ export function CreatePost({
   }
 
   function handleSubmit() {
+    if (isPending || !canSubmitPost) return;
+
     setError(null);
     setFieldErrors({});
     startTransition(async () => {
@@ -176,7 +181,7 @@ export function CreatePost({
             type="button"
             className="_feed_inner_text_area_btn_link"
             onClick={handleSubmit}
-            disabled={isPending || (!body.trim() && !image)}
+            disabled={isPending || !canSubmitPost}
           >
             <SendIcon />
             <span>{isPending ? "Posting…" : "Post"}</span>
