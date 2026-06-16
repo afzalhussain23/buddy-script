@@ -381,10 +381,22 @@
         display: none;
     }
     ._feed_inner_text_area_bottom {
-        display: none;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        height: auto;
+        padding: 12px 5px 8px 5px !important;
     }
-    ._feed_inner_text_area_bottom_mobile {
-        display: block;
+    ._feed_inner_text_area_item {
+        flex: 1 1 auto;
+        width: 100%;
+        justify-content: space-evenly;
+        margin: 0 0 20px 0;
+    }
+    ._feed_inner_text_area_btn {
+        width: 100%;
+    }
+    ._feed_inner_text_area_btn_link {
+        width: 100%;
     }
     ._feed_inner_ppl_card_mobile {
         display: block;
