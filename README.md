@@ -10,9 +10,9 @@ Buddy Script is a Next.js social feed application based on the provided Login, R
 
 ## Video demo
 
-📺 **Watch the walkthrough:** https://youtu.be/ScMzIvxBSi4
+📺 **Watch the walkthrough:** https://youtu.be/zEz9beSKics
 
-[![Buddy Script demo](https://img.youtube.com/vi/ScMzIvxBSi4/maxresdefault.jpg)](https://youtu.be/ScMzIvxBSi4)
+[![Buddy Script demo](https://img.youtube.com/vi/zEz9beSKics/maxresdefault.jpg)](https://youtu.be/zEz9beSKics)
 
 ## Tech stack
 
