@@ -196,7 +196,12 @@ export const PostCard = memo(function PostCard({
             </div>
           </div>
         </div>
-        <p className="_feed_inner_timeline_post_title">{post.body}</p>
+        <p
+          className="_feed_inner_timeline_post_title"
+          style={{ whiteSpace: "pre-wrap" }}
+        >
+          {post.body}
+        </p>
         {post.imageUrl ? (
           <div className="_feed_inner_timeline_image">
             {post.imageWidth && post.imageHeight ? (
@@ -521,7 +526,12 @@ function CommentRow({
             <div className="_comment_details_top">
               <div className="_comment_name">
                 <h4 className="_comment_name_title">{comment.authorName}</h4>
-                <p className="_comment_status_text">{comment.body}</p>
+                <p
+                  className="_comment_status_text"
+                  style={{ whiteSpace: "pre-wrap" }}
+                >
+                  {comment.body}
+                </p>
               </div>
             </div>
           </div>
@@ -605,7 +615,12 @@ function ReplyRow({ reply }: { reply: FeedComment }) {
           <div className="_comment_details_top">
             <div className="_comment_name">
               <h4 className="_comment_name_title">{reply.authorName}</h4>
-              <p className="_comment_status_text">{reply.body}</p>
+              <p
+                className="_comment_status_text"
+                style={{ whiteSpace: "pre-wrap" }}
+              >
+                {reply.body}
+              </p>
             </div>
           </div>
         </div>
