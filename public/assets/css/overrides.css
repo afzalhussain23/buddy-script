@@ -18,6 +18,15 @@ select:focus-visible,
   border-radius: 3px;
 }
 
+._textarea:focus,
+._textarea:focus-visible,
+._comment_textarea:focus,
+._comment_textarea:focus-visible {
+  border-color: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
 /* Placeholder nav/menu actions that have no destination yet are rendered as
    <button> (not <a href="#0">) so keyboard/AT users don't land on dead links.
    This strips the default button chrome while keeping the theme's link classes

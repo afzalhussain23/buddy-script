@@ -167,6 +167,9 @@ export const createPostSchema = z
         `Post must be at most ${MAX_POST_LENGTH.toLocaleString()} characters.`,
       ),
     uploadId: uuidSchema("Invalid image upload.").nullable(),
+    isPrivate: z
+      .boolean({ message: "Post privacy must be true or false." })
+      .default(false),
   })
   .superRefine((data, ctx) => {
     if (!data.body && !data.uploadId) {

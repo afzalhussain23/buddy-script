@@ -5,14 +5,7 @@ import { Avatar } from "@/components/avatar";
 import { MAX_IMAGE_UPLOAD_BYTES, uploadImageToR2 } from "@/lib/image-upload";
 import type { FieldErrors } from "@/lib/validation";
 import { createPost } from "./actions";
-import {
-  ArticleIcon,
-  EventIcon,
-  PencilIcon,
-  PhotoIcon,
-  SendIcon,
-  VideoIcon,
-} from "./feed-icons";
+import { PencilIcon, PhotoIcon, SendIcon } from "./feed-icons";
 import type { FeedPost } from "./queries";
 
 export function CreatePost({
@@ -25,6 +18,7 @@ export function CreatePost({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [body, setBody] = useState("");
   const [image, setImage] = useState<File | null>(null);
+  const [isPrivate, setIsPrivate] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [isPending, startTransition] = useTransition();
@@ -47,7 +41,7 @@ export function CreatePost({
     startTransition(async () => {
       try {
         const uploadId = image ? await uploadImageToR2(image) : null;
-        const result = await createPost({ body, uploadId });
+        const result = await createPost({ body, uploadId, isPrivate });
         if (!result.ok) {
           setFieldErrors(result.fieldErrors ?? {});
           if (!result.fieldErrors || !Object.keys(result.fieldErrors).length) {
@@ -58,6 +52,7 @@ export function CreatePost({
         onCreated(result.post);
         setBody("");
         setImage(null);
+        setIsPrivate(false);
         if (fileInputRef.current) fileInputRef.current.value = "";
       } catch (uploadError) {
         setError(
@@ -122,6 +117,11 @@ export function CreatePost({
           {fieldErrors.uploadId[0]}
         </p>
       ) : null}
+      {fieldErrors.isPrivate?.[0] ? (
+        <p role="alert" style={{ margin: "12px 0 0", color: "#c62828" }}>
+          {fieldErrors.isPrivate[0]}
+        </p>
+      ) : null}
       {error ? (
         <p role="alert" style={{ margin: "12px 0 0", color: "#c62828" }}>
           {error}
@@ -130,6 +130,26 @@ export function CreatePost({
 
       <div className="_feed_inner_text_area_bottom">
         <div className="_feed_inner_text_area_item">
+          <div className="_feed_inner_text_area_bottom_article _feed_common">
+            <label
+              className="_feed_inner_text_area_bottom_photo_link"
+              style={{
+                alignItems: "center",
+                cursor: isPending ? "not-allowed" : "pointer",
+                display: "inline-flex",
+                width: 92,
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={isPrivate}
+                disabled={isPending}
+                onChange={(event) => setIsPrivate(event.target.checked)}
+                style={{ marginRight: 8 }}
+              />
+              {isPrivate ? "Private" : "Public"}
+            </label>
+          </div>
           <div className="_feed_inner_text_area_bottom_photo _feed_common">
             <input
               ref={fileInputRef}
@@ -148,39 +168,6 @@ export function CreatePost({
                 <PhotoIcon />
               </span>
               Photo
-            </button>
-          </div>
-          <div className="_feed_inner_text_area_bottom_video _feed_common">
-            <button
-              type="button"
-              className="_feed_inner_text_area_bottom_photo_link"
-            >
-              <span className="_feed_inner_text_area_bottom_photo_iamge _mar_img">
-                <VideoIcon />
-              </span>
-              Video
-            </button>
-          </div>
-          <div className="_feed_inner_text_area_bottom_event _feed_common">
-            <button
-              type="button"
-              className="_feed_inner_text_area_bottom_photo_link"
-            >
-              <span className="_feed_inner_text_area_bottom_photo_iamge _mar_img">
-                <EventIcon />
-              </span>
-              Event
-            </button>
-          </div>
-          <div className="_feed_inner_text_area_bottom_article _feed_common">
-            <button
-              type="button"
-              className="_feed_inner_text_area_bottom_photo_link"
-            >
-              <span className="_feed_inner_text_area_bottom_photo_iamge _mar_img">
-                <ArticleIcon />
-              </span>
-              Article
             </button>
           </div>
         </div>

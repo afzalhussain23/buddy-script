@@ -108,7 +108,7 @@ export async function createPost(input: unknown): Promise<CreatePostResult> {
   if (!parsed.success) {
     return validationFailure(parsed.error, "Invalid post data.");
   }
-  const { body, uploadId } = parsed.data;
+  const { body, uploadId, isPrivate } = parsed.data;
   const rateLimit = await consumeRateLimit("create-post", session.user.id);
   if (!rateLimit.allowed) {
     return { ok: false, error: "Too many posts. Please try again shortly." };
@@ -119,7 +119,7 @@ export async function createPost(input: unknown): Promise<CreatePostResult> {
     try {
       [row] = await db
         .insert(posts)
-        .values({ authorId: session.user.id, body })
+        .values({ authorId: session.user.id, body, isPrivate })
         .returning();
     } catch (error) {
       return unexpectedFailure("Failed to create post", error);
@@ -185,6 +185,7 @@ export async function createPost(input: unknown): Promise<CreatePostResult> {
           id: postId,
           authorId: session.user.id,
           body,
+          isPrivate,
           imageObjectKey: upload.publishedObjectKey,
           imageWidth: imageDimensions.width,
           imageHeight: imageDimensions.height,
