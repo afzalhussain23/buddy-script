@@ -6,61 +6,22 @@ import { useEffect, useRef, useState } from "react";
 import { Avatar } from "@/components/avatar";
 import { authClient } from "@/lib/auth-client";
 
-const notifications = [
-  {
-    image: "/assets/images/friend-req.png",
-    kind: "link" as const,
-    time: "42 minutes ago",
-  },
-  {
-    image: "/assets/images/profile-1.png",
-    kind: "group" as const,
-    time: "42 minutes ago",
-  },
-  {
-    image: "/assets/images/friend-req.png",
-    kind: "link" as const,
-    time: "42 minutes ago",
-  },
-  {
-    image: "/assets/images/profile-1.png",
-    kind: "group" as const,
-    time: "42 minutes ago",
-  },
-  {
-    image: "/assets/images/friend-req.png",
-    kind: "link" as const,
-    time: "42 minutes ago",
-  },
-  {
-    image: "/assets/images/profile-1.png",
-    kind: "group" as const,
-    time: "42 minutes ago",
-  },
-];
-
 export function FeedNav({ name }: { name: string }) {
   const router = useRouter();
-  const [notifyOpen, setNotifyOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
-  const notifyRef = useRef<HTMLLIElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
 
-  // Close either dropdown on an outside click or the Escape key.
+  // Close the profile dropdown on an outside click or the Escape key.
   useEffect(() => {
     function onClick(e: MouseEvent) {
       const t = e.target as Node;
-      if (notifyRef.current && !notifyRef.current.contains(t)) {
-        setNotifyOpen(false);
-      }
       if (profileRef.current && !profileRef.current.contains(t)) {
         setProfileOpen(false);
       }
     }
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") {
-        setNotifyOpen(false);
         setProfileOpen(false);
       }
     }
@@ -194,14 +155,11 @@ export function FeedNav({ name }: { name: string }) {
                   <span className="visually-hidden">Friend requests</span>
                 </button>
               </li>
-              <li className="nav-item _header_nav_item" ref={notifyRef}>
+              <li className="nav-item _header_nav_item">
                 <button
                   type="button"
                   className="nav-link _header_nav_link _header_notify_btn"
                   aria-label="Notifications (6 unread)"
-                  aria-haspopup="menu"
-                  aria-expanded={notifyOpen}
-                  onClick={() => setNotifyOpen((v) => !v)}
                 >
                   <svg
                     aria-hidden="true"
@@ -223,70 +181,6 @@ export function FeedNav({ name }: { name: string }) {
                     6
                   </span>
                 </button>
-                <div
-                  className={`_notification_dropdown${notifyOpen ? " show" : ""}`}
-                >
-                  <div className="_notifications_content">
-                    <h4 className="_notifications_content_title">
-                      Notifications
-                    </h4>
-                  </div>
-                  <div className="_notifications_drop_box">
-                    <div className="_notifications_drop_btn_grp">
-                      <button type="button" className="_notifications_btn_link">
-                        All
-                      </button>
-                      <button
-                        type="button"
-                        className="_notifications_btn_link1"
-                      >
-                        Unread
-                      </button>
-                    </div>
-                    <div className="_notifications_all">
-                      {notifications.map((n, i) => (
-                        <div
-                          className="_notification_box"
-                          key={`${n.image}-${i}`}
-                        >
-                          <div className="_notification_image">
-                            <Image
-                              src={n.image}
-                              alt=""
-                              className="_notify_img"
-                              width={56}
-                              height={56}
-                            />
-                          </div>
-                          <div className="_notification_txt">
-                            {n.kind === "link" ? (
-                              <p className="_notification_para">
-                                <span className="_notify_txt_link">
-                                  Steve Jobs
-                                </span>{" "}
-                                posted a link in your timeline.
-                              </p>
-                            ) : (
-                              <p className="_notification_para">
-                                An admin changed the name of the group{" "}
-                                <span className="_notify_txt_link">
-                                  Freelacer usa
-                                </span>{" "}
-                                to{" "}
-                                <span className="_notify_txt_link">
-                                  Freelacer usa
-                                </span>
-                              </p>
-                            )}
-                            <div className="_nitification_time">
-                              <span>{n.time}</span>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
               </li>
               <li className="nav-item _header_nav_item">
                 <button
