@@ -89,19 +89,19 @@ Schema lives in `src/db` (`auth.ts` for authentication, `social.ts` for the feed
 
 ## Seed data
 
-The database is seeded with several months of activity (posts dated August 2025 – June 2026) to exercise pagination and the denormalized counters at realistic scale:
+The database is seeded with recent activity (posts dated 10–18 June 2026) to exercise pagination and the denormalized counters:
 
 | Entity | Count |
 | --- | --- |
 | Users | ~2,000 |
-| Posts | ~335,000 (≈17,000 private) |
-| Comments | ~335,000 |
-| Replies | ~84,000 |
-| Post likes | ~671,000 |
-| Comment likes | ~126,000 |
+| Posts | ~5,000 (264 private) |
+| Comments | ~5,000 |
+| Replies | ~1,200 |
+| Post likes | ~9,950 |
+| Comment likes | ~2,150 |
 
 > [!NOTE]
-> The demo runs on Neon's free tier, which caps a branch at **512 MiB** of logical storage. That ceiling is why the dataset tops out in the hundreds of thousands rather than millions of posts — seeding millions would blow past the free-tier limit. The scale here is already enough to exercise pagination and the denormalized counters realistically.
+> The demo runs on Neon's free tier, which allows **0.5 GB** of storage. The dataset is kept to a few thousand posts to stay comfortably under that ceiling while still being enough to exercise pagination and the denormalized counters realistically.
 
 ## Limits
 
